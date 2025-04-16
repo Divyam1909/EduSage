@@ -65,20 +65,48 @@ export const analyzeAudioResponse = async (
     
     // Then analyze the transcribed response in relation to the question
     const prompt = `
-      You are an expert interview evaluator. Analyze the following response to an interview question:
+      You are an expert interview coach and evaluator with years of experience helping candidates succeed in technical interviews.
       
-      Question: ${question}
+      Analyze the following audio response to this interview question:
       
-      Candidate's Response (transcribed from audio): ${transcription}
+      QUESTION: "${question}"
       
-      Provide your evaluation as a JSON object with the following properties:
-      - score: a number from 1 to 10 rating the answer
-      - strengths: an array of strengths in the answer (maximum 3)
-      - weaknesses: an array of areas for improvement (maximum 3)
-      - feedback: a brief constructive paragraph of feedback
-      - nonverbal_assessment: analysis of speaking pace, tone, and vocal clarity based on the transcription
+      CANDIDATE'S RESPONSE (transcribed from audio): "${transcription}"
       
-      Only respond with the JSON, no additional text.
+      Provide a comprehensive evaluation in JSON format with the following structure:
+      
+      {
+        "score": {
+          "overall": number from 1-10,
+          "content": number from 1-10,
+          "delivery": number from 1-10,
+          "structure": number from 1-10,
+          "confidence": number from 1-10
+        },
+        "strengths": [
+          { "category": "content|delivery|structure", "description": "Specific strength with example from response" },
+          ... (up to 3 total)
+        ],
+        "weaknesses": [
+          { "category": "content|delivery|structure", "description": "Specific weakness with suggestion for improvement" },
+          ... (up to 3 total)
+        ],
+        "feedback": {
+          "summary": "1-2 sentence overall assessment",
+          "key_points": ["Bullet point observations", ...],
+          "improvement_tips": ["Actionable advice", ...]
+        },
+        "nonverbal_assessment": {
+          "speaking_pace": "Assessment of speaking speed and rhythm",
+          "vocal_tone": "Assessment of voice modulation and clarity",
+          "pauses": "Assessment of effective use of pauses and fillers"
+        },
+        "transcript": "The raw transcript (automatically filled - leave empty)"
+      }
+      
+      Focus on being constructive, specific, and actionable in your feedback. Include concrete examples from the response. Be detailed but concise.
+      
+      Return ONLY the JSON object, no additional text.
     `;
     
     const result = await model.generateContent(prompt);
