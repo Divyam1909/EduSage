@@ -2,7 +2,7 @@
 // This file provides functions to interact with the Gemini API for interview assistance
 import { getGenerativeModel } from "./aiClient";
 
-// Requests go through the backend, which uses the gemini-3.5-flash model
+// Requests go through the backend, which picks the Gemini model
 const model = getGenerativeModel();
 
 // Helper function to handle model requests

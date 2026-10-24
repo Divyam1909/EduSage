@@ -2,10 +2,12 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Shared Gemini client; the API key is only ever read on the server
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = "gemini-3.5-flash";
+// Flash-Lite: fast, and its free-tier daily quota is far above the full Flash model's
+const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
-// Gemini returns these for temporary overload or rate limits
-const RETRYABLE_STATUSES = [429, 500, 503];
+// Gemini returns these for temporary overload; 429 (quota) is not retried
+// because daily quotas reset only hours later
+const RETRYABLE_STATUSES = [500, 503];
 
 const getModel = (generationConfig) => genAI.getGenerativeModel({ model: MODEL_NAME, generationConfig });
 

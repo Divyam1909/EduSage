@@ -1,7 +1,7 @@
 // Video Transcription Service using Gemini API
 import { getGenerativeModel } from "./aiClient";
 
-// Requests go through the backend, which uses the gemini-3.5-flash model
+// Requests go through the backend, which picks the Gemini model
 const model = getGenerativeModel({
   temperature: 0.1, // Lower temperature for more accurate transcription
   maxOutputTokens: 8192, // Allow for longer responses

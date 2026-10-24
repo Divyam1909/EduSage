@@ -1,7 +1,8 @@
 const pdfParse = require("pdf-parse");
 const { getModel, generateWithRetry } = require("./utils/gemini");
 
-const model = getModel();
+// A single JSON-mode pass keeps extraction to a few seconds on serverless
+const model = getModel({ responseMimeType: "application/json" });
 
 /**
  * Helper function to convert different date formats to ISO "YYYY-MM-DD" format
@@ -155,72 +156,9 @@ async function processTextWithGemini(pdfText) {
     Return ONLY the JSON array with all the events, no additional text or markdown formatting.
     `;
 
-    // Run the extraction twice, using results from first pass to improve second pass
-    const initialResult = await generateWithRetry(model, prompt);
-    const initialResponse = await initialResult.response;
-    const initialText = initialResponse.text();
-    
-    let initialEvents = [];
-    try {
-      initialEvents = parseJsonResponse(initialText);
-    } catch (error) {
-      console.log("Error in first pass extraction, continuing with second pass");
-    }
-    
-    // Extract common patterns and potential missing events for second pass
-    const secondPassPrompt = `
-    You are an academic calendar parsing expert specializing in extracting structured event data from PDF documents with 100% accuracy.
-    
-    Here is the content from an academic calendar PDF (may be incomplete or have formatting issues):
-    
-    ${pdfText.substring(0, 35000)} 
-    
-    A first pass of event extraction has already been performed, identifying ${initialEvents.length} events.
-    
-    Your task is to perform a critical second-pass review to:
-    1. Identify ANY events missed in the first pass, particularly looking for:
-       - Events with unusual formatting
-       - Events mentioned in paragraph form rather than in tables
-       - Implicit events (like academic deadlines mentioned indirectly)
-       - Events with partial or ambiguous dates
-    
-    2. Validate and correct issues with existing events:
-       - Verify all dates are valid and in the correct format
-       - Ensure consistent event categorization
-       - Fix any title inconsistencies
-       - Cross-reference dates with contextual information
-    
-    Remember to follow these strict requirements:
-    - Titles must be MAX 25 characters
-    - Dates must be in YYYY-MM-DD format
-    - Include ALL relevant details in the details field
-    - Create separate events for date ranges (start date and end date)
-    
-    For any new or corrected events, include them in the comprehensive JSON array following this format:
-    
-    [
-      {
-        "title": "Very Short Title",
-        "date": "YYYY-MM-DD",
-        "details": "Full details and description of the event, including any specific times or additional information"
-      },
-      ...
-    ]
-    
-    Return ONLY the complete JSON array with ALL events, no additional text or markdown formatting.
-    `;
-    
-    let events;
-    try {
-      const secondResult = await generateWithRetry(model, secondPassPrompt);
-      events = parseJsonResponse(secondResult.response.text());
-    } catch (error) {
-      // Keep the first-pass events rather than losing everything
-      if (initialEvents.length === 0) throw error;
-      console.error("Second pass failed, using first-pass events:", error.message);
-      return initialEvents;
-    }
-    console.log(`Successfully extracted ${events.length} events using Gemini AI (two-pass process)`);
+    const result = await generateWithRetry(model, prompt);
+    const events = parseJsonResponse(result.response.text());
+    console.log(`Successfully extracted ${events.length} events using Gemini AI`);
     return events;
   } catch (error) {
     console.error("Error using Gemini API for event extraction:", error);
