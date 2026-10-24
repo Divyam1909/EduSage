@@ -5,9 +5,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// Use gemini-1.5-flash model for transcription and analysis
+// Use gemini-3.5-flash model for transcription and analysis
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-1.5-flash",
+  model: "gemini-3.5-flash",
   generationConfig: {
     temperature: 0.1, // Lower temperature for more accurate transcription
     maxOutputTokens: 8192, // Allow for longer responses

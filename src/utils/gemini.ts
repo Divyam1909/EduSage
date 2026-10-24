@@ -7,8 +7,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// Use gemini-1.5-flash model which is available in the API
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Use gemini-3.5-flash model which is available in the API
+const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
 // Helper function to handle model requests
 const handleModelRequest = async (prompt: string) => {
