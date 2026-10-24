@@ -34,3 +34,5 @@ backend/logs/
 
 # Build artifacts
 *.tsbuildinfo
+
+.vercel
