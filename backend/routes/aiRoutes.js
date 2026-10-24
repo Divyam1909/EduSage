@@ -1,11 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { authenticateToken } = require('../middleware/auth');
+const { getModel, generateWithRetry } = require('../utils/gemini');
 
 // The Gemini key stays on the server; the frontend sends prompts through this route
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = 'gemini-3.5-flash';
 
 // Only these generation settings may be chosen by the client
 const ALLOWED_CONFIG_KEYS = ['temperature', 'maxOutputTokens', 'responseMimeType'];
@@ -34,8 +32,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME, generationConfig: config });
-    const result = await model.generateContent(contents);
+    const result = await generateWithRetry(getModel(config), contents);
     res.json({ text: result.response.text() });
   } catch (error) {
     console.error('Gemini request failed:', error.message);
