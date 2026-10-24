@@ -27,6 +27,28 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Only students (tokens carrying a roll number) may continue
+function requireStudent(req, res, next) {
+  authenticateToken(req, res, () => {
+    if (!req.user.rollno) {
+      return res.status(403).json({ message: "Student access required" });
+    }
+    next();
+  });
+}
+
+// Only teachers may continue
+function requireTeacher(req, res, next) {
+  authenticateToken(req, res, () => {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ message: "Teacher access required" });
+    }
+    next();
+  });
+}
+
 module.exports = {
-  authenticateToken
+  authenticateToken,
+  requireStudent,
+  requireTeacher
 }; 

@@ -5,6 +5,13 @@ import axios from 'axios';
 // production and by the Vite dev proxy (to localhost:5000) in development
 export const BACKEND_URL = '/api';
 
+// Login token for the current area of the app: teacher pages use the teacher
+// login, everything else the student login
+export const getAuthToken = () => {
+  const isTeacherPage = window.location.pathname.startsWith('/teacher');
+  return localStorage.getItem(isTeacherPage ? 'teacherToken' : 'token');
+};
+
 // Create an axios instance with the backend URL
 export const apiClient = axios.create({
   baseURL: BACKEND_URL,
@@ -19,6 +26,11 @@ apiClient.interceptors.request.use(config => {
   if (config.data instanceof FormData) {
     // For FormData, let the browser set the Content-Type with boundary
     delete config.headers['Content-Type'];
+  }
+  // Send the login token unless the caller set one explicitly
+  const token = getAuthToken();
+  if (token && !config.headers['Authorization']) {
+    config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;
 });
@@ -36,6 +48,12 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   try {
     // Create headers object
     const headers = { ...options.headers };
+
+    // Send the login token unless the caller set one explicitly
+    const token = getAuthToken();
+    if (token && !headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     
     // For FormData requests, don't set Content-Type to let browser handle it
     if (options.body instanceof FormData) {

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const Event = require('../models/Event');
-const { authenticateToken } = require('../middleware/auth');
+const { requireStudent } = require('../middleware/auth');
 
 // Create a new event
-router.post("/", authenticateToken, async (req, res) => {
+router.post("/", requireStudent, async (req, res) => {
   try {
     console.log("POST /api/events - Request payload:", {
       body: req.body,
@@ -47,7 +47,7 @@ router.post("/", authenticateToken, async (req, res) => {
 });
 
 // Get all events for the authenticated user
-router.get("/", authenticateToken, async (req, res) => {
+router.get("/", requireStudent, async (req, res) => {
   try {
     // Only retrieve events for the authenticated user
     const events = await Event.find({ userId: req.user.rollno }).lean();
@@ -59,7 +59,7 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 // Update an event
-router.put("/:id", authenticateToken, async (req, res) => {
+router.put("/:id", requireStudent, async (req, res) => {
   try {
     const { title, date, time, details, notifications } = req.body;
     
@@ -99,7 +99,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
 });
 
 // Delete an event
-router.delete("/:id", authenticateToken, async (req, res) => {
+router.delete("/:id", requireStudent, async (req, res) => {
   try {
     // First check if event belongs to user
     const event = await Event.findById(req.params.id);

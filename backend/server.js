@@ -17,7 +17,7 @@ const Answer = require('./models/Answer');
 const SubjectMark = require('./models/SubjectMark');
 const Quiz = require("./models/Quiz.js");
 const QuizAttempt = require("./models/QuizAttempt.js");
-const { authenticateToken } = require('./middleware/auth');
+const { authenticateToken, requireStudent } = require('./middleware/auth');
 
 // Import routes
 const calendarRoutes = require('./routes/calendarRoutes');
@@ -29,6 +29,10 @@ const app = express();
 
 // On Vercel the filesystem is read-only and there is no long-running process
 const IS_SERVERLESS = !!process.env.VERCEL;
+
+// Teachers can manage any content; students only what they created
+const canManage = (user, createdBy) =>
+  user.role === "teacher" || (!!createdBy && createdBy === user.rollno);
 
 // Define multer upload handler for file uploads
 const uploadHandler = multer({
@@ -302,13 +306,14 @@ app.post("/login", async (req, res) => {
 
 /** ========== RESOURCE APIs ========== **/
 // Add Resource
-app.post("/api/resources", async (req, res) => {
+app.post("/api/resources", authenticateToken, async (req, res) => {
   try {
     const { fileName, courseName, fileLink } = req.body;
     if (!fileName || !courseName || !fileLink) {
       return res.status(400).json({ message: "All fields are required" });
     }
-    const newResource = new Resource({ fileName, courseName, fileLink });
+    const createdBy = req.user.rollno || req.user.id;
+    const newResource = new Resource({ fileName, courseName, fileLink, createdBy });
     await newResource.save();
     res.status(201).json(newResource);
   } catch (error) {
@@ -327,17 +332,18 @@ app.get("/api/resources", async (req, res) => {
 });
 
 // Update Resource
-app.put("/api/resources/:id", async (req, res) => {
+app.put("/api/resources/:id", authenticateToken, async (req, res) => {
   try {
     const { fileName, courseName, fileLink } = req.body;
-    const updatedResource = await Resource.findByIdAndUpdate(
-      req.params.id,
-      { fileName, courseName, fileLink },
-      { new: true }
-    );
-    if (!updatedResource) {
+    const resource = await Resource.findById(req.params.id);
+    if (!resource) {
       return res.status(404).json({ message: "Resource not found" });
     }
+    if (!canManage(req.user, resource.createdBy)) {
+      return res.status(403).json({ message: "Not allowed to edit this resource" });
+    }
+    Object.assign(resource, { fileName, courseName, fileLink });
+    const updatedResource = await resource.save();
     res.json(updatedResource);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -345,12 +351,16 @@ app.put("/api/resources/:id", async (req, res) => {
 });
 
 // Delete Resource
-app.delete("/api/resources/:id", async (req, res) => {
+app.delete("/api/resources/:id", authenticateToken, async (req, res) => {
   try {
-    const deletedResource = await Resource.findByIdAndDelete(req.params.id);
-    if (!deletedResource) {
+    const resource = await Resource.findById(req.params.id);
+    if (!resource) {
       return res.status(404).json({ message: "Resource not found" });
     }
+    if (!canManage(req.user, resource.createdBy)) {
+      return res.status(403).json({ message: "Not allowed to delete this resource" });
+    }
+    await resource.deleteOne();
     res.json({ message: "Resource deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -358,7 +368,7 @@ app.delete("/api/resources/:id", async (req, res) => {
 });
 
 // Toggle Bookmark
-app.put("/api/resources/:id/bookmark", async (req, res) => {
+app.put("/api/resources/:id/bookmark", authenticateToken, async (req, res) => {
   try {
     const resource = await Resource.findById(req.params.id);
     if (!resource)
@@ -372,7 +382,7 @@ app.put("/api/resources/:id/bookmark", async (req, res) => {
 });
 
 // Get Only Bookmarked Resources
-app.get("/api/resources/bookmarked", async (req, res) => {
+app.get("/api/resources/bookmarked", authenticateToken, async (req, res) => {
   try {
     const bookmarkedResources = await Resource.find({ bookmarked: true }).lean();
     res.json(bookmarkedResources);
@@ -387,7 +397,7 @@ app.use('/api/events', eventRoutes);
 
 /** ========== NEW ENDPOINT: Retrieve Pending Notifications ========== **/
 // Optimized to query only potentially relevant events
-app.get("/api/notifications/pending", async (req, res) => {
+app.get("/api/notifications/pending", requireStudent, async (req, res) => {
   try {
     const now = new Date();
     const pendingNotifications = [];
@@ -403,6 +413,7 @@ app.get("/api/notifications/pending", async (req, res) => {
 
     // --- Check for Day Before Notifications --- 
     const dayBeforeEvents = await Event.find({
+      userId: req.user.rollno,
       "notifications.dayBefore": true,
       "notificationStatus.dayBeforeSent": false,
       date: { 
@@ -424,6 +435,7 @@ app.get("/api/notifications/pending", async (req, res) => {
 
     // --- Check for Day Of Notifications --- 
     const dayOfEvents = await Event.find({
+      userId: req.user.rollno,
       "notifications.dayOf": true,
       "notificationStatus.dayOfSent": false,
       date: { 
@@ -443,6 +455,7 @@ app.get("/api/notifications/pending", async (req, res) => {
 
     // --- Check for At Time Notifications ---
     const potentiallyDueAtTimeEvents = await Event.find({
+      userId: req.user.rollno,
       "notifications.atTime": true,
       "notificationStatus.atTimeSent": false,
       date: { 
@@ -478,7 +491,7 @@ app.get("/api/notifications/pending", async (req, res) => {
 });
 
 /** ========== QUESTION APIs ========== **/
-app.post("/api/questions", authenticateToken, async (req, res) => {
+app.post("/api/questions", requireStudent, async (req, res) => {
   try {
     const { title, details, subject } = req.body;
     if (!title || !subject) {
@@ -550,7 +563,7 @@ app.get("/api/questions/:id", async (req, res) => {
 });
 
 // Delete a question - only the user who asked can delete
-app.delete("/api/questions/:id", authenticateToken, async (req, res) => {
+app.delete("/api/questions/:id", requireStudent, async (req, res) => {
   try {
     const question = await Question.findById(req.params.id);
     if (!question) {
@@ -587,7 +600,7 @@ app.delete("/api/questions/:id", authenticateToken, async (req, res) => {
 });
 
 // Approve an answer - only the user who asked the question can approve
-app.put("/api/questions/:questionId/approve/:answerId", authenticateToken, async (req, res) => {
+app.put("/api/questions/:questionId/approve/:answerId", requireStudent, async (req, res) => {
   try {
     const { questionId, answerId } = req.params;
     
@@ -641,22 +654,6 @@ app.put("/api/questions/:questionId/approve/:answerId", authenticateToken, async
 });
 
 // Increment wisdom points on a question
-app.put("/api/questions/:id/wisdom", async (req, res) => {
-  try {
-    const { wisdomPoints } = req.body;
-    const question = await Question.findById(req.params.id);
-    if (!question) {
-      return res.status(404).json({ message: "Question not found" });
-    }
-    question.wisdomPoints += wisdomPoints;
-    await question.save();
-    res.json(question);
-  } catch (error) {
-    console.error("Error sharing wisdom", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
 // Get answers for a question
 app.get("/api/questions/:id/answers", async (req, res) => {
   try {
@@ -668,7 +665,7 @@ app.get("/api/questions/:id/answers", async (req, res) => {
 });
 
 // Post an answer for a question
-app.post("/api/questions/:id/answers", authenticateToken, async (req, res) => {
+app.post("/api/questions/:id/answers", requireStudent, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     const user = req.user.rollno; // Get user from token
@@ -713,7 +710,7 @@ app.post("/api/questions/:id/answers", authenticateToken, async (req, res) => {
 });
 
 // Update an answer
-app.put("/api/answers/:id", authenticateToken, async (req, res) => {
+app.put("/api/answers/:id", requireStudent, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     const answer = await Answer.findById(req.params.id);
@@ -736,7 +733,7 @@ app.put("/api/answers/:id", authenticateToken, async (req, res) => {
 });
 
 // Delete an answer
-app.delete("/api/answers/:id", authenticateToken, async (req, res) => {
+app.delete("/api/answers/:id", requireStudent, async (req, res) => {
   try {
     const answer = await Answer.findById(req.params.id);
     if (!answer) {
@@ -763,7 +760,7 @@ app.delete("/api/answers/:id", authenticateToken, async (req, res) => {
 });
 
 // Get user profile
-app.get("/profile", authenticateToken, async (req, res) => {
+app.get("/profile", requireStudent, async (req, res) => {
   try {
     const { rollno } = req.user;
     const user = await User.findOne({ rollno }).select("-password");
@@ -797,7 +794,7 @@ app.get("/profile", authenticateToken, async (req, res) => {
 });
 
 /** ========== NEW ENDPOINT: Update User Profile ========== **/
-app.put("/api/profile/update", authenticateToken, async (req, res) => {
+app.put("/api/profile/update", requireStudent, async (req, res) => {
   try {
     const { rollno } = req.user;
     const { name, branch, sem, email, phone, dateOfBirth } = req.body;
@@ -851,7 +848,7 @@ app.put("/api/profile/update", authenticateToken, async (req, res) => {
 });
 
 /** ========== NEW ENDPOINT: Update Profile Photo ========== **/
-app.post("/api/profile/photo", authenticateToken, uploadHandler.single("photo"), async (req, res) => {
+app.post("/api/profile/photo", requireStudent, uploadHandler.single("photo"), async (req, res) => {
   try {
     // First check if authentication was successful
     if (!req.user || !req.user.rollno) {
@@ -1004,7 +1001,7 @@ app.get("/api/classResults", authenticateToken, async (req, res) => {
 
 /** ========== QUIZ APIs ========== **/
 // Create a new Quiz
-app.post("/api/quizzes", async (req, res) => {
+app.post("/api/quizzes", authenticateToken, async (req, res) => {
   try {
     const { title, topic, difficulty, timeLimit, points, questions, clearable } = req.body;
     if (
@@ -1019,7 +1016,8 @@ app.post("/api/quizzes", async (req, res) => {
     ) {
       return res.status(400).json({ message: "All quiz fields are required and must be valid" });
     }
-    const newQuiz = new Quiz({ title, topic, difficulty, timeLimit, points, questions, clearable });
+    const createdBy = req.user.rollno || req.user.id;
+    const newQuiz = new Quiz({ title, topic, difficulty, timeLimit, points, questions, clearable, createdBy });
     await newQuiz.save();
     res.status(201).json(newQuiz);
   } catch (error) {
@@ -1049,12 +1047,16 @@ app.get("/api/quizzes/:id", async (req, res) => {
 });
 
 // Delete a Quiz
-app.delete("/api/quizzes/:id", async (req, res) => {
+app.delete("/api/quizzes/:id", authenticateToken, async (req, res) => {
   try {
-    const deletedQuiz = await Quiz.findByIdAndDelete(req.params.id);
-    if (!deletedQuiz) {
+    const quiz = await Quiz.findById(req.params.id);
+    if (!quiz) {
       return res.status(404).json({ message: "Quiz not found" });
     }
+    if (!canManage(req.user, quiz.createdBy)) {
+      return res.status(403).json({ message: "Not allowed to delete this quiz" });
+    }
+    await quiz.deleteOne();
     res.json({ message: "Quiz deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -1062,10 +1064,12 @@ app.delete("/api/quizzes/:id", async (req, res) => {
 });
 
 // Submit a Quiz Attempt
-app.post("/api/quizzes/:id/attempt", async (req, res) => {
+app.post("/api/quizzes/:id/attempt", requireStudent, async (req, res) => {
   try {
     console.log("Received quiz attempt submission for quiz ID:", req.params.id);
-    const { user, answers, timeTaken, tabViolation } = req.body;
+    // The attempt always belongs to the logged-in student, never a user named in the body
+    const user = req.user.rollno;
+    const { answers, timeTaken, tabViolation } = req.body;
     const quiz = await Quiz.findById(req.params.id).lean().exec();
     if (!quiz) {
       console.error("Quiz not found for ID:", req.params.id);
@@ -1136,9 +1140,9 @@ app.post("/api/quizzes/:id/attempt", async (req, res) => {
 });
 
 // Get quiz attempts for a user
-app.get("/api/quizAttempts", async (req, res) => {
+app.get("/api/quizAttempts", requireStudent, async (req, res) => {
   try {
-    const user = req.query.user;
+    const user = req.user.rollno;
     if (!user) return res.status(400).json({ message: "User required" });
     const attempts = await QuizAttempt.find({ user }).populate("quizId").lean();
     res.json(attempts);
@@ -1148,10 +1152,10 @@ app.get("/api/quizAttempts", async (req, res) => {
 });
 
 // DELETE all clearable quiz attempts for a user
-app.delete("/api/quizAttempts/clearAll", async (req, res) => {
+app.delete("/api/quizAttempts/clearAll", requireStudent, async (req, res) => {
   try {
-    console.log("Clear all attempts requested for user:", req.query.user);
-    const user = req.query.user;
+    const user = req.user.rollno;
+    console.log("Clear all attempts requested for user:", user);
     if (!user) return res.status(400).json({ message: "User required" });
     
     await QuizAttempt.deleteMany({ user, clearable: true });
@@ -1167,12 +1171,16 @@ app.delete("/api/quizAttempts/clearAll", async (req, res) => {
 });
 
 // DELETE a single quiz attempt by ID
-app.delete("/api/quizAttempts/:id", async (req, res) => {
+app.delete("/api/quizAttempts/:id", requireStudent, async (req, res) => {
   try {
-    const attempt = await QuizAttempt.findByIdAndDelete(req.params.id);
+    const attempt = await QuizAttempt.findById(req.params.id);
     if (!attempt) {
       return res.status(404).json({ message: "Attempt not found" });
     }
+    if (attempt.user !== req.user.rollno) {
+      return res.status(403).json({ message: "Not allowed to delete this attempt" });
+    }
+    await attempt.deleteOne();
     
     // Recalculate wisdom points after deleting the attempt
     await recalculateWisdomPoints(attempt.user);
@@ -1185,7 +1193,7 @@ app.delete("/api/quizAttempts/:id", async (req, res) => {
 
 /** ========== SUBJECT MARKS & STATS APIs ========== **/
 // Get subject marks for the logged-in user
-app.get("/api/user/stats/subject", authenticateToken, async (req, res) => {
+app.get("/api/user/stats/subject", requireStudent, async (req, res) => {
   try {
     const marks = await SubjectMark.find({ user: req.user.rollno }).lean();
     res.json(marks);
@@ -1195,7 +1203,7 @@ app.get("/api/user/stats/subject", authenticateToken, async (req, res) => {
 });
 
 // Add a new subject mark record
-app.post("/api/user/stats/subject", authenticateToken, async (req, res) => {
+app.post("/api/user/stats/subject", requireStudent, async (req, res) => {
   try {
     const { subject, cia1, cia2, midSem, endSem } = req.body;
     const newMark = new SubjectMark({
@@ -1218,7 +1226,7 @@ app.post("/api/user/stats/subject", authenticateToken, async (req, res) => {
 });
 
 // Update subject mark record
-app.put("/api/user/stats/subject/:id", authenticateToken, async (req, res) => {
+app.put("/api/user/stats/subject/:id", requireStudent, async (req, res) => {
   try {
     const { subject, cia1, cia2, midSem, endSem } = req.body;
     const updatedMark = await SubjectMark.findOneAndUpdate(
@@ -1238,7 +1246,7 @@ app.put("/api/user/stats/subject/:id", authenticateToken, async (req, res) => {
 });
 
 // Delete subject mark record
-app.delete("/api/user/stats/subject/:id", authenticateToken, async (req, res) => {
+app.delete("/api/user/stats/subject/:id", requireStudent, async (req, res) => {
   try {
     const deleted = await SubjectMark.findOneAndDelete({ _id: req.params.id, user: req.user.rollno });
     if (!deleted) return res.status(404).json({ message: "Record not found" });
@@ -1316,15 +1324,6 @@ async function recalculateWisdomPoints(rollno) {
 
 /** ========== EVENT NOTIFICATION SYSTEM ========== **/
 // Add a new endpoint to check for pending notifications
-app.get("/api/notifications/check", async (req, res) => {
-  try {
-    await checkAndProcessNotifications();
-    res.json({ message: "Notification check completed" });
-  } catch (error) {
-    console.error("Error checking notifications:", error);
-    res.status(500).json({ message: "Error checking notifications" });
-  }
-});
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, 'logs');

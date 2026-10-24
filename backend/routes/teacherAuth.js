@@ -5,7 +5,7 @@ const Teacher = require("../models/Teacher");
 const User = require("../models/User");
 const SubjectMark = require("../models/SubjectMark");
 const QuizAttempt = require("../models/QuizAttempt");
-const { authenticateToken } = require("../middleware/auth");
+const { requireTeacher } = require("../middleware/auth");
 const multer = require("multer");
 const uploadHandler = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -64,15 +64,8 @@ router.post("/forgot", async (req, res) => {
   res.json({ message: "If the teacher exists, a password reset link will be sent to the registered email." });
 });
 
-// Middleware to check that the request comes from a logged-in teacher
-function authenticateTeacher(req, res, next) {
-  authenticateToken(req, res, () => {
-    if (req.user.role !== "teacher") {
-      return res.status(403).json({ message: "Teacher access required" });
-    }
-    next();
-  });
-}
+// Teacher-only routes below
+const authenticateTeacher = requireTeacher;
 
 // Get all students with details
 router.get("/students", authenticateTeacher, async (req, res) => {

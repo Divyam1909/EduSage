@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const { extractEventsFromPDF } = require('../pdfParser');
 const Event = require('../models/Event');
-const { authenticateToken } = require('../middleware/auth'); // Import authentication middleware
+const { requireStudent } = require('../middleware/auth'); // Import authentication middleware
 
 // Keep PDF uploads in memory: they are only parsed, never stored
 const storage = multer.memoryStorage();
@@ -21,7 +21,7 @@ const upload = multer({
 });
 
 // Route to upload and process PDF
-router.post('/upload', authenticateToken, upload.single('pdf'), async (req, res) => {
+router.post('/upload', requireStudent, upload.single('pdf'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No PDF file uploaded' });
@@ -101,7 +101,7 @@ router.post('/upload', authenticateToken, upload.single('pdf'), async (req, res)
 });
 
 // Add an alternative route that matches the frontend route
-router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req, res) => {
+router.post('/upload-pdf', requireStudent, upload.single('pdf'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No PDF file uploaded' });
@@ -181,7 +181,7 @@ router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req, 
 });
 
 // Route to delete all PDF-imported events
-router.delete('/pdf-events', authenticateToken, async (req, res) => {
+router.delete('/pdf-events', requireStudent, async (req, res) => {
   try {
     // Only delete PDF events for the authenticated user
     const result = await Event.deleteMany({ 

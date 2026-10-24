@@ -17,6 +17,7 @@ const QuizSchema = new mongoose.Schema({
     },
   ],
   createdAt: { type: Date, default: Date.now },
+  createdBy: { type: String }, // rollno of the student or id of the teacher who created it
 });
 
 module.exports = mongoose.model("Quiz", QuizSchema);
