@@ -210,10 +210,8 @@ cd backend
 # Install dependencies
 npm install
 
-# Create .env file with your MongoDB URI and JWT secret
-# Example:
-# MONGO_URI=mongodb://localhost:27017/edusage
-# JWT_SECRET=your_secret_key
+# Create the single .env file in the project root (used by frontend and backend)
+# cp .env.example .env   then fill in MONGO_URI, JWT_SECRET, VITE_GEMINI_API_KEY
 
 # Start backend server
 node server.js
@@ -388,7 +386,7 @@ The platform includes an AI-powered interview simulation feature that helps stud
 The AI Interview feature requires a Google Gemini API key to function:
 
 1. If you don't already have one, get a Gemini API key from [Google AI Studio](https://ai.google.dev/)
-2. Add your API key to the `backend/.env` file:
+2. Add your API key to the `.env` file in the project root:
    ```
    VITE_GEMINI_API_KEY=your_gemini_api_key_here
    ```

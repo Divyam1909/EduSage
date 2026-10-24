@@ -8,7 +8,6 @@ const QuizAttempt = require("../models/QuizAttempt");
 const { authenticateToken } = require("../middleware/auth");
 const multer = require("multer");
 const uploadHandler = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-require("dotenv").config();
 
 const router = express.Router();
 

@@ -1,5 +1,4 @@
 const jwt = require("jsonwebtoken");
-require("dotenv").config();
 
 // Middleware to authenticate JWT token
 function authenticateToken(req, res, next) {

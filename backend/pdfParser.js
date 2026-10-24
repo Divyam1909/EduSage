@@ -1,6 +1,5 @@
 const pdfParse = require("pdf-parse");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-require('dotenv').config();
 
 // Initialize the Gemini API with the API key from environment variables
 const API_KEY = process.env.VITE_GEMINI_API_KEY;
