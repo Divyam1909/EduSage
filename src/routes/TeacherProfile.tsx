@@ -1,19 +1,16 @@
-//@ts-nocheck
 import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../utils/api";
 import { User, Calendar, ListChecks, Edit3, LogOut, Save, BookOpen, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/components/ToastContainer";
+import type { TeacherProfile as TeacherProfileData } from "@/types";
 
 export default function TeacherProfile() {
-  const [profile, setProfile] = useState<any>(null);
-  const [editMode, setEditMode] = useState(false);
-  const [form, setForm] = useState<any>({});
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const { showToast } = useToast();
+  const [profile, setProfile] = useState<TeacherProfileData | null>(null);
+  const [form, setForm] = useState<Partial<TeacherProfileData>>({});
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [profileUpdateError, setProfileUpdateError] = useState("");
@@ -23,9 +20,13 @@ export default function TeacherProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
+  // Load the profile once on mount; fetchProfile is also reused after updates
+  const fetchProfileRef = useRef(() => {});
   useEffect(() => {
-    fetchProfile();
+    fetchProfileRef.current();
   }, []);
+
+  fetchProfileRef.current = fetchProfile;
 
   async function fetchProfile() {
     try {
@@ -45,10 +46,10 @@ export default function TeacherProfile() {
           email: data.email || "",
         });
       } else {
-        setError("Failed to load profile");
+        showToast("Failed to load profile", "error");
       }
-    } catch (e) {
-      setError("Failed to load profile");
+    } catch {
+      showToast("Failed to load profile", "error");
     }
   }
 
@@ -67,7 +68,7 @@ export default function TeacherProfile() {
 
   function handleProfileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
-    setForm((prev: any) => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   }
 
   async function handleProfileUpdate(e: React.FormEvent) {
@@ -96,14 +97,14 @@ export default function TeacherProfile() {
         const err = await response.json();
         setProfileUpdateError(err.message || "Failed to update profile");
       }
-    } catch (e) {
+    } catch {
       setProfileUpdateError("Failed to update profile");
     } finally {
       setUpdatingProfile(false);
     }
   }
 
-  async function handlePhotoChange(e: any) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || !e.target.files[0]) return;
     const formData = new FormData();
     formData.append("photo", e.target.files[0]);
@@ -123,7 +124,7 @@ export default function TeacherProfile() {
       } else {
         setPhotoMessage("Failed to update photo");
       }
-    } catch (e) {
+    } catch {
       setPhotoMessage("Failed to update photo");
     } finally {
       setUploading(false);

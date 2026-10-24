@@ -1,5 +1,6 @@
 // Video Transcription Service using Gemini API
 import { getGenerativeModel } from "./aiClient";
+import { normalizeEvaluation, type ResponseEvaluation } from "@/types/interview";
 
 // Requests go through the backend, which picks the Gemini model
 const model = getGenerativeModel({
@@ -16,7 +17,7 @@ const DEFAULT_TIMEOUT = 40000; // 40 seconds
  * @param ms Timeout in milliseconds
  */
 const createTimeout = (ms: number) => {
-  return new Promise((_, reject) => {
+  return new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms);
   });
 };
@@ -70,7 +71,7 @@ export const transcribeVideo = async (videoBase64: string, timeoutMs = DEFAULT_T
     const result = await Promise.race([
       transcriptionPromise,
       createTimeout(timeoutMs)
-    ]) as any;
+    ]);
     
     const response = await result.response;
     const transcription = response.text().trim();
@@ -79,7 +80,7 @@ export const transcribeVideo = async (videoBase64: string, timeoutMs = DEFAULT_T
     console.log(`Video transcription completed in ${(endTime - startTime).toFixed(2)}ms`);
     
     return transcription;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error transcribing video:", error);
     const endTime = performance.now();
     console.log(`Video transcription failed after ${(endTime - startTime).toFixed(2)}ms`);
@@ -100,7 +101,7 @@ export const analyzeVideoResponse = async (
   videoBase64: string,
   question: string,
   timeoutMs = DEFAULT_TIMEOUT * 2 // Double timeout for analysis
-): Promise<any> => {
+): Promise<ResponseEvaluation> => {
   const startTime = performance.now();
   try {
     // First, transcribe the video
@@ -186,7 +187,7 @@ export const analyzeVideoResponse = async (
     const result = await Promise.race([
       analysisPromise,
       createTimeout(timeoutMs)
-    ]) as any;
+    ]);
     
     const response = await result.response;
     const text = response.text();
@@ -205,7 +206,7 @@ export const analyzeVideoResponse = async (
       let analysisResult;
       try {
         analysisResult = JSON.parse(jsonText);
-      } catch (syntaxError) {
+      } catch {
         // If parsing fails, try to fix common JSON issues
         const fixedJson = jsonText
           .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":') // Fix unquoted keys
@@ -218,7 +219,7 @@ export const analyzeVideoResponse = async (
       console.log(`Video analysis completed in ${(endTime - startTime).toFixed(2)}ms`);
       
       return {
-        ...analysisResult,
+        ...normalizeEvaluation(analysisResult),
         transcript: transcription,
         processing_time_ms: Math.round(endTime - startTime)
       };
@@ -226,7 +227,7 @@ export const analyzeVideoResponse = async (
       console.error("Failed to parse JSON from API response:", parseError);
       throw new Error("Invalid response format from AI model");
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error analyzing video response:", error);
     const endTime = performance.now();
     console.log(`Video analysis failed after ${(endTime - startTime).toFixed(2)}ms`);
@@ -263,7 +264,7 @@ export const analyzeVideoResponse = async (
         professional_appearance: "Unable to assess"
       },
       transcript: "Transcription failed or was incomplete. Please try again with a clearer video.",
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       processing_time_ms: Math.round(endTime - startTime)
     };
   }

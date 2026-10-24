@@ -1,6 +1,6 @@
-//@ts-nocheck
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ToastContainer";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +48,7 @@ interface ClassResults {
 }
 
 export default function ProfilePage() {
+  const { showToast } = useToast();
   const { userData, refreshUserData, userRankData, fetchUserRankings } = useUser();
   const navigate = useNavigate();
   const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -67,17 +68,6 @@ export default function ProfilePage() {
   const [classResults, setClassResults] = useState<ClassResults | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [token, setToken] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [photoMessage, setPhotoMessage] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [markError, setMarkError] = useState("");
-  const [markMessage, setMarkMessage] = useState("");
-  const [submittingMark, setSubmittingMark] = useState(false);
-  const [editMarkError, setEditMarkError] = useState("");
-  const [editMarkMessage, setEditMarkMessage] = useState("");
-  const [editingSubject, setEditingSubject] = useState<SubjectMarks | null>(null);
-  const [editingMarkType, setEditingMarkType] = useState("");
-  const [editingMarkValue, setEditingMarkValue] = useState("");
   const [profileFormData, setProfileFormData] = useState({
     name: "",
     branch: "",
@@ -107,11 +97,6 @@ export default function ProfilePage() {
     ? (subjectMarks.reduce((acc, mark) => acc + calculateTotalMarks(mark), 0) / (subjectMarks.length * 120)) * 100
     : 0;
 
-  // Calculate students beat count based on userRankData from context
-  const studentsBeat = userRankData.rank > 0 && userData 
-    ? userRankData.rank - 1 
-    : 0;
-
   // Initialize token from localStorage
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
@@ -124,12 +109,10 @@ export default function ProfilePage() {
   useEffect(() => {
     // Function to fetch user data
     const fetchUserData = async () => {
-      setIsLoading(true);
       try {
         // Get token
         const tokenFromStorage = localStorage.getItem("token");
         if (!tokenFromStorage) {
-          setIsLoading(false);
           return;
         }
         
@@ -167,11 +150,9 @@ export default function ProfilePage() {
         // Fetch user rankings with context function to ensure consistency
         fetchUserRankings();
         
-      } catch (error) {
+      } catch {
         setSubjectMarks([]);
         setClassResults(null);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -197,12 +178,11 @@ export default function ProfilePage() {
     formData.append("photo", e.target.files[0]);
 
     try {
-      setUploading(true);
       
       // Get the authentication token
       const token = localStorage.getItem("token");
       if (!token) {
-        setPhotoMessage("Authentication error - please log in again");
+        showToast("Authentication error - please log in again", "error");
         return;
       }
       
@@ -219,15 +199,13 @@ export default function ProfilePage() {
       if (response.ok) {
         // Refresh user data to get updated photo URL
         refreshUserData();
-        setPhotoMessage("Photo updated successfully");
+        showToast("Photo updated successfully", "success");
       } else {
         const errorData = await response.text();
-        setPhotoMessage(errorData || "Failed to update photo");
+        showToast(errorData || "Failed to update photo", "error");
       }
-    } catch (error) {
-      setPhotoMessage("Error uploading photo");
-    } finally {
-      setUploading(false);
+    } catch {
+      showToast("Error uploading photo", "error");
     }
   };
 
@@ -236,12 +214,11 @@ export default function ProfilePage() {
     e.preventDefault();
     
     if (!formData.subject) {
-      setMarkError("Please select a subject");
+      showToast("Please select a subject", "error");
       return;
     }
 
     try {
-      setSubmittingMark(true);
       const response = await apiFetch("api/user/stats/subject", {
         method: "POST",
         headers: {
@@ -258,7 +235,7 @@ export default function ProfilePage() {
       });
 
       if (response.ok) {
-        setMarkMessage("Mark added successfully");
+        showToast("Mark added successfully", "success");
         setSubjectMarks([...subjectMarks, await response.json()]);
         setSelectedSubject(null);
         setFormData({ subject: "", cia1: 0, cia2: 0, midSem: 0, endSem: 0 });
@@ -267,12 +244,10 @@ export default function ProfilePage() {
         refreshUserData();
         fetchUserRankings();
       } else {
-        setMarkError("Failed to add mark");
+        showToast("Failed to add mark", "error");
       }
-    } catch (error) {
-      setMarkError("Error adding mark");
-    } finally {
-      setSubmittingMark(false);
+    } catch {
+      showToast("Error adding mark", "error");
     }
   };
 
@@ -281,7 +256,7 @@ export default function ProfilePage() {
     e.preventDefault();
     
     if (!formData.subject || !selectedSubject) {
-      setEditMarkError("Please fill all fields");
+      showToast("Please fill all fields", "error");
       return;
     }
 
@@ -308,19 +283,16 @@ export default function ProfilePage() {
             mark._id === updatedMark._id ? updatedMark : mark
           )
         );
-        setEditMarkMessage("Mark updated successfully");
-        setEditingSubject(null);
-        setEditingMarkType("");
-        setEditingMarkValue("");
+        showToast("Mark updated successfully", "success");
         
         // Refresh user data and rankings
         refreshUserData();
         fetchUserRankings();
       } else {
-        setEditMarkError("Failed to update mark");
+        showToast("Failed to update mark", "error");
       }
-    } catch (error) {
-      setEditMarkError("Error updating mark");
+    } catch {
+      showToast("Error updating mark", "error");
     }
   };
 
@@ -336,16 +308,16 @@ export default function ProfilePage() {
 
       if (response.ok) {
         setSubjectMarks(subjectMarks.filter((mark) => mark._id !== id));
-        setMarkMessage("Mark deleted successfully");
+        showToast("Mark deleted successfully", "success");
         
         // Refresh user data and rankings
         refreshUserData();
         fetchUserRankings();
       } else {
-        setMarkError("Failed to delete mark");
+        showToast("Failed to delete mark", "error");
       }
-    } catch (error) {
-      setMarkError("Error deleting mark");
+    } catch {
+      showToast("Error deleting mark", "error");
     }
   };
 
@@ -453,7 +425,6 @@ export default function ProfilePage() {
       });
       
       if (response.ok) {
-        const data = await response.json();
         setProfileUpdateSuccess("Profile updated successfully");
         
         // Close the dialog after a delay

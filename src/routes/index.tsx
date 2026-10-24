@@ -1,4 +1,3 @@
-//@ts-nocheck
 import Calendar from "./Calendar";
 import Interface from "./Interface";
 import QuizInterface from "./QuizInterface";

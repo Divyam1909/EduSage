@@ -1,5 +1,6 @@
 // Audio Transcription Service using Gemini API
 import { getGenerativeModel } from "./aiClient";
+import { normalizeEvaluation, type ResponseEvaluation } from "@/types/interview";
 
 // Requests go through the backend, which picks the Gemini model
 const model = getGenerativeModel({
@@ -16,7 +17,7 @@ const DEFAULT_TIMEOUT = 30000; // 30 seconds
  * @param ms Timeout in milliseconds
  */
 const createTimeout = (ms: number) => {
-  return new Promise((_, reject) => {
+  return new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms);
   });
 };
@@ -73,7 +74,7 @@ export const transcribeAudio = async (audioBase64: string, timeoutMs = DEFAULT_T
     const result = await Promise.race([
       transcriptionPromise,
       createTimeout(timeoutMs)
-    ]) as any;
+    ]);
     
     const response = await result.response;
     const transcription = response.text().trim();
@@ -82,7 +83,7 @@ export const transcribeAudio = async (audioBase64: string, timeoutMs = DEFAULT_T
     console.log(`Audio transcription completed in ${(endTime - startTime).toFixed(2)}ms`);
     
     return transcription;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error transcribing audio:", error);
     const endTime = performance.now();
     console.log(`Audio transcription failed after ${(endTime - startTime).toFixed(2)}ms`);
@@ -103,7 +104,7 @@ export const analyzeAudioResponse = async (
   audioBase64: string,
   question: string,
   timeoutMs = DEFAULT_TIMEOUT * 2 // Double timeout for analysis
-): Promise<any> => {
+): Promise<ResponseEvaluation> => {
   const startTime = performance.now();
   try {
     // First, transcribe the audio
@@ -183,7 +184,7 @@ export const analyzeAudioResponse = async (
     const result = await Promise.race([
       analysisPromise,
       createTimeout(timeoutMs)
-    ]) as any;
+    ]);
     
     const response = await result.response;
     const text = response.text();
@@ -202,7 +203,7 @@ export const analyzeAudioResponse = async (
       let analysisResult;
       try {
         analysisResult = JSON.parse(jsonText);
-      } catch (syntaxError) {
+      } catch {
         // If parsing fails, try to fix common JSON issues
         const fixedJson = jsonText
           .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":') // Fix unquoted keys
@@ -215,7 +216,7 @@ export const analyzeAudioResponse = async (
       console.log(`Audio analysis completed in ${(endTime - startTime).toFixed(2)}ms`);
       
       return {
-        ...analysisResult,
+        ...normalizeEvaluation(analysisResult),
         transcript: transcription,
         processing_time_ms: Math.round(endTime - startTime)
       };
@@ -223,7 +224,7 @@ export const analyzeAudioResponse = async (
       console.error("Failed to parse JSON from API response:", parseError);
       throw new Error("Invalid response format from AI model");
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error analyzing audio response:", error);
     const endTime = performance.now();
     console.log(`Audio analysis failed after ${(endTime - startTime).toFixed(2)}ms`);
@@ -254,7 +255,7 @@ export const analyzeAudioResponse = async (
         pauses: "Unable to assess"
       },
       transcript: "Transcription failed or was incomplete. Please try again.",
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       processing_time_ms: Math.round(endTime - startTime)
     };
   }

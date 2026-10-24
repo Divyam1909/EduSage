@@ -1,6 +1,6 @@
-//@ts-nocheck
 import React, { createContext, useState, useEffect, useCallback, useMemo, ReactNode, useRef } from "react";
 import { apiFetch } from "../utils/api";
+import type { StudentProfile } from "@/types";
 
 // Configuration constants
 const MIN_LOADER_DISPLAY_TIME_MS = 1;
@@ -9,8 +9,8 @@ const LOADER_ENABLED = false;
 
 // Define the shape of our context type
 interface UserContextType {
-  userData: any;
-  setUserData: React.Dispatch<React.SetStateAction<any>>;
+  userData: StudentProfile | null;
+  setUserData: React.Dispatch<React.SetStateAction<StudentProfile | null>>;
   isLoading: boolean; // Initial user data loading
   error: string | null;
   refreshUserData: () => Promise<void>;
@@ -41,7 +41,7 @@ declare global {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<StudentProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true); // For initial fetch
   const [isAppLoading, setIsAppLoading] = useState<boolean>(false); // Global loader state
   const [error, setError] = useState<string | null>(null);
@@ -256,13 +256,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Find current user's rank
         const userRollno = userData.rollno;
         let rank = 0;
-        let totalUsers = rankingsData.totalUsers || 0;
-        let averagePoints = rankingsData.averageWisdomPoints || 0;
+        const totalUsers = rankingsData.totalUsers || 0;
+        const averagePoints = rankingsData.averageWisdomPoints || 0;
         
         if (rankingsData.rankings && rankingsData.rankings.length > 0) {
           // Find the user's position in rankings
           const userIndex = rankingsData.rankings.findIndex(
-            user => String(user.rollno) === String(userRollno)
+            (user: { rollno: string | number }) => String(user.rollno) === String(userRollno)
           );
           
           if (userIndex !== -1) {
@@ -277,7 +277,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           averagePoints
         });
       }
-    } catch (err) {
+    } catch {
       // Silent error handling
     }
   }, [userData]);
@@ -304,7 +304,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await fetchUserData();
       // User data will have changed, which will trigger fetchUserRankings
-    } catch (error) {
+    } catch {
       // Silent error
       // Make sure to hide loader even on error (if it was shown)
       if (loaderEnabled) {

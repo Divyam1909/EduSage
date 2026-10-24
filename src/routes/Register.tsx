@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -118,7 +117,7 @@ export default function Register() {
     }
   };
 
-  const handleKeyPress = (e: { key: string }) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleSubmit(e);
     }

@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, FileText, BookOpen, Calendar, User, ListChecks } from "lucide-react";
@@ -20,7 +19,9 @@ export default function TeacherDashboard() {
           const data = await response.json();
           setTeacherName(data.name || "");
         }
-      } catch (e) {}
+      } catch {
+        // The greeting falls back to no name if the profile can't be loaded
+      }
     }
     fetchProfile();
   }, []);

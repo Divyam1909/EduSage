@@ -1,12 +1,10 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { apiClient } from "../utils/api";
 import { 
   Bookmark, 
   Trash2, 
-  BookOpen, 
   User, 
   FileText, 
   Calendar, 

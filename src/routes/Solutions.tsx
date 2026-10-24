@@ -1,13 +1,8 @@
-//@ts-nocheck
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
-  Star,
-  ThumbsUp,
-  MessageSquare,
-  Plus,
   FileText,
   Users,
   BookOpen,
@@ -96,7 +91,7 @@ export default function Solutions() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   // For current user
   const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   
   // Helper functions for auth and API calls
   const getToken = useCallback(() => localStorage.getItem("token"), []);

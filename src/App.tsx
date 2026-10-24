@@ -1,5 +1,4 @@
-//@ts-nocheck
-import { Routes, Route, Outlet, useLocation, useNavigationType } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigationType } from "react-router-dom";
 import { UserProvider, useUser } from "./context/UserContext";
 import { lazy, Suspense, useEffect } from "react";
 import Loader from "./components/Loader.tsx";

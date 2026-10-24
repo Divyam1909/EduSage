@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,11 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../utils/api";
 import { FileText, Calendar, User, ListChecks, BookOpen } from "lucide-react";
+import type { Resource } from "@/types";
 
 export default function TeacherResources() {
-  const [resources, setResources] = useState<any[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [editResource, setEditResource] = useState<any>(null);
+  const [editResource, setEditResource] = useState<Resource | null>(null);
   const [form, setForm] = useState({ fileName: "", courseName: "", fileLink: "" });
   const [error, setError] = useState("");
 
@@ -20,9 +20,9 @@ export default function TeacherResources() {
     try {
       const res = await apiFetch("/api/resources");
       setResources(await res.json());
-    } catch (e) { setError("Failed to load resources"); }
+    } catch { setError("Failed to load resources"); }
   }
-  function openModal(resource: any = null) {
+  function openModal(resource: Resource | null = null) {
     setEditResource(resource);
     setForm(resource ? { ...resource } : { fileName: "", courseName: "", fileLink: "" });
     setShowModal(true);
@@ -42,15 +42,15 @@ export default function TeacherResources() {
       } else {
         setError("Failed to save resource");
       }
-    } catch (e) { setError("Failed to save resource"); }
+    } catch { setError("Failed to save resource"); }
   }
-  async function handleDelete(id: any) {
+  async function handleDelete(id: string) {
     if (!window.confirm("Delete this resource?")) return;
     try {
       const res = await apiFetch(`/api/resources/${id}`, { method: "DELETE" });
       if (res.ok) fetchResources();
       else setError("Failed to delete resource");
-    } catch (e) { setError("Failed to delete resource"); }
+    } catch { setError("Failed to delete resource"); }
   }
 
   return (

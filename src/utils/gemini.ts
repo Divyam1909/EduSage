@@ -1,6 +1,8 @@
 // Google Gemini AI API integration for EduSage
 // This file provides functions to interact with the Gemini API for interview assistance
 import { getGenerativeModel } from "./aiClient";
+import { normalizeEvaluation, normalizeOverallFeedback } from "@/types/interview";
+import type { GeneratedQuestion, OverallFeedback, ResponseEvaluation } from "@/types/interview";
 
 // Requests go through the backend, which picks the Gemini model
 const model = getGenerativeModel();
@@ -45,7 +47,7 @@ export const generateInterviewQuestions = async (
   jobRole: string,
   techStack: string,
   experience: string
-): Promise<any[]> => {
+): Promise<GeneratedQuestion[]> => {
   try {
     const prompt = `Generate 5 focused interview questions for a ${experience} ${jobRole} position that specifically tests knowledge of ${techStack}.
     
@@ -118,7 +120,7 @@ export const evaluateInterviewResponse = async (
   techStack: string,
   question: string,
   answer: string
-): Promise<any> => {
+): Promise<ResponseEvaluation> => {
   try {
     const prompt = `
       You are an expert interview coach and evaluator with years of experience helping candidates succeed in technical interviews.
@@ -176,7 +178,7 @@ export const evaluateInterviewResponse = async (
         jsonText = text.split("```")[1].split("```")[0].trim();
       }
       
-      return JSON.parse(jsonText);
+      return normalizeEvaluation(JSON.parse(jsonText));
     } catch (parseError) {
       console.error("Failed to parse JSON from API response:", parseError);
       throw new Error("Invalid response format from AI model");
@@ -222,8 +224,8 @@ export const generateOverallFeedback = async (
   jobRole: string,
   techStack: string,
   experience: string,
-  questionAnswers: any[]
-): Promise<any> => {
+  questionAnswers: { question: string; answer?: string; evaluation?: ResponseEvaluation }[]
+): Promise<OverallFeedback> => {
   try {
     // Check if any of the answers have visual assessment (from video responses)
     const hasVideoResponses = questionAnswers.some(qa => 
@@ -324,7 +326,7 @@ export const generateOverallFeedback = async (
         jsonText = text.split("```")[1].split("```")[0].trim();
       }
       
-      return JSON.parse(jsonText);
+      return normalizeOverallFeedback(JSON.parse(jsonText));
     } catch (parseError) {
       console.error("Failed to parse JSON from API response:", parseError);
       throw new Error("Invalid response format from AI model");

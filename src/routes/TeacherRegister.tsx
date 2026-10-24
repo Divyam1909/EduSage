@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -64,14 +63,16 @@ export default function TeacherRegister() {
       let data;
       try {
         data = await response.json();
-      } catch (jsonError) {}
+      } catch {
+        // Non-JSON response: handled by the generic error below
+      }
       if (response.ok) {
         alert("Registration successful! Please login.");
         navigate("/tlogin");
       } else {
         setError(data?.message || "Registration failed");
       }
-    } catch (error) {
+    } catch {
       setError("Something went wrong. Please try again later.");
     } finally {
       setIsSubmitting(false);
@@ -81,7 +82,7 @@ export default function TeacherRegister() {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleSubmit(e as any);
+      handleSubmit(e);
     }
   };
 

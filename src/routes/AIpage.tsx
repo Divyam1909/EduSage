@@ -1,11 +1,9 @@
-//@ts-nocheck
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import type { OverallFeedback, QuestionFeedback, ResponseEvaluation } from "@/types/interview"
 import { 
-  BookOpen, Home, Menu, MessageSquare, PenTool, Play, HelpCircle, 
-  BookOpenCheck, Users, FileText, PuzzleIcon as Quiz, User, Bookmark, Calendar, 
-  GraduationCap,
+  BookOpen, MessageSquare, PenTool, Play, HelpCircle, 
+  BookOpenCheck, Users, FileText, User, Bookmark, Calendar,
   Bot,
   Loader2,
   Mic,
@@ -23,7 +21,6 @@ import {
   evaluateInterviewResponse, 
   generateOverallFeedback 
 } from "@/utils/gemini"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
@@ -36,7 +33,7 @@ interface InterviewQuestion {
   question: string;
   type: string;
   answer?: string;
-  evaluation?: any;
+  evaluation?: ResponseEvaluation;
 }
 
 interface InterviewData {
@@ -46,7 +43,7 @@ interface InterviewData {
   interviewMode: 'video' | 'chat';
   questions: InterviewQuestion[];
   currentQuestionIndex: number;
-  overallFeedback: any;
+  overallFeedback: OverallFeedback | null;
   status: 'setup' | 'questions' | 'feedback' | 'complete';
   isLoading: boolean;
   error: string | null;
@@ -56,8 +53,8 @@ interface InterviewData {
 declare global {
   interface Window {
     botpressWebChat: {
-      init: (config: any) => void;
-      sendEvent: (event: any) => void;
+      init: (config: Record<string, unknown>) => void;
+      sendEvent: (event: Record<string, unknown>) => void;
     }
   }
 }
@@ -96,40 +93,43 @@ interface InterviewHistoryItem {
   techStack: string;
   experience: string;
   interviewMode: 'video' | 'chat';
-  overallFeedback: any;
+  overallFeedback: OverallFeedback;
   questions: InterviewQuestion[];
 }
 
+// Common tech skills/languages/frameworks
+const validTechStacks = [
+  'javascript', 'typescript', 'python', 'java', 'c#', 'c++', 'go', 'rust', 'ruby', 'php',
+  'react', 'angular', 'vue', 'svelte', 'node', 'express', 'django', 'flask', 'spring', 'asp.net',
+  'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'jenkins', 'git',
+  'mongodb', 'mysql', 'postgresql', 'sql server', 'oracle', 'redis', 'elasticsearch',
+  'machine learning', 'data science', 'artificial intelligence', 'deep learning', 'nlp',
+  'html', 'css', 'sass', 'less', 'tailwind', 'bootstrap', 'material-ui', 'chakra-ui',
+  'devops', 'security', 'blockchain', 'graphql', 'rest api', 'microservices'
+];
+
+// Common job roles in tech
+const validJobRoles = [
+  'frontend developer', 'backend developer', 'fullstack developer', 'web developer', 
+  'software engineer', 'software developer', 'mobile developer', 'ios developer', 'android developer',
+  'data scientist', 'data analyst', 'data engineer', 'machine learning engineer', 'ai engineer',
+  'devops engineer', 'site reliability engineer', 'cloud engineer', 'security engineer',
+  'qa engineer', 'test engineer', 'automation engineer', 'database administrator', 'dba',
+  'product manager', 'project manager', 'scrum master', 'agile coach', 'ui designer', 'ux designer',
+  'ui/ux designer', 'graphic designer', 'technical writer', 'content developer',
+  'systems administrator', 'network engineer', 'it support', 'helpdesk technician',
+  'blockchain developer', 'game developer', 'ar/vr developer', 'embedded systems engineer'
+];
+
 // Main component for the AI Assistant page that provides AI-powered learning tools
 export default function Component() {
+  // Latest versions of callbacks used inside long-lived listeners and timers
+  const actionsRef = useRef({ endInterviewDueToTabChange: () => {}, handleTimeUp: () => {}, saveInterviewToHistory: () => {} });
   // State for managing selected topics and chat modal visibility
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([])
+  const [selectedTopics] = useState<string[]>([])
   const [isChatModalOpen, setIsChatModalOpen] = useState(false)
   const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false)
   
-  // Common tech skills/languages/frameworks
-  const validTechStacks = [
-    'javascript', 'typescript', 'python', 'java', 'c#', 'c++', 'go', 'rust', 'ruby', 'php',
-    'react', 'angular', 'vue', 'svelte', 'node', 'express', 'django', 'flask', 'spring', 'asp.net',
-    'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'jenkins', 'git',
-    'mongodb', 'mysql', 'postgresql', 'sql server', 'oracle', 'redis', 'elasticsearch',
-    'machine learning', 'data science', 'artificial intelligence', 'deep learning', 'nlp',
-    'html', 'css', 'sass', 'less', 'tailwind', 'bootstrap', 'material-ui', 'chakra-ui',
-    'devops', 'security', 'blockchain', 'graphql', 'rest api', 'microservices'
-  ];
-  
-  // Common job roles in tech
-  const validJobRoles = [
-    'frontend developer', 'backend developer', 'fullstack developer', 'web developer', 
-    'software engineer', 'software developer', 'mobile developer', 'ios developer', 'android developer',
-    'data scientist', 'data analyst', 'data engineer', 'machine learning engineer', 'ai engineer',
-    'devops engineer', 'site reliability engineer', 'cloud engineer', 'security engineer',
-    'qa engineer', 'test engineer', 'automation engineer', 'database administrator', 'dba',
-    'product manager', 'project manager', 'scrum master', 'agile coach', 'ui designer', 'ux designer',
-    'ui/ux designer', 'graphic designer', 'technical writer', 'content developer',
-    'systems administrator', 'network engineer', 'it support', 'helpdesk technician',
-    'blockchain developer', 'game developer', 'ar/vr developer', 'embedded systems engineer'
-  ];
   
   // Chat iframe reference
   const chatIframeRef = useRef<HTMLIFrameElement>(null);
@@ -155,12 +155,11 @@ export default function Component() {
 
   // Response mode state (text, audio, or video)
   const [responseMode, setResponseMode] = useState<'text' | 'audio' | 'video'>('text');
-  const [audioAnalysis, setAudioAnalysis] = useState<any>(null);
-  const [videoAnalysis, setVideoAnalysis] = useState<any>(null);
+  const [audioAnalysis, setAudioAnalysis] = useState<ResponseEvaluation | null>(null);
+  const [videoAnalysis, setVideoAnalysis] = useState<ResponseEvaluation | null>(null);
   const [responseTranscript, setResponseTranscript] = useState('');
 
   // List of available topics for filtering AI resources
-  const topics = ["COA", "DLDA", "DSA", "EM", "DBMS"]
 
   // Timer state variables
   const [timeRemaining, setTimeRemaining] = useState<number>(10 * 60); // 10 minutes in seconds
@@ -191,14 +190,14 @@ export default function Component() {
   const techStackDropdownRef = useRef<HTMLDivElement>(null);
   
   // Filter job roles based on search term
-  const filteredJobRoles = interviewData.status === 'setup' ? validJobRoles.filter((role: string) => 
+  const filteredJobRoles = useMemo(() => (interviewData.status === 'setup' ? validJobRoles.filter((role: string) => 
     role.toLowerCase().includes(jobRoleSearchTerm.toLowerCase())
-  ) : [];
+  ) : []), [interviewData.status, jobRoleSearchTerm]);
   
   // Filter tech stacks based on search term
-  const filteredTechStacks = interviewData.status === 'setup' ? validTechStacks.filter((tech: string) => 
+  const filteredTechStacks = useMemo(() => (interviewData.status === 'setup' ? validTechStacks.filter((tech: string) => 
     tech.toLowerCase().includes(techStackSearchTerm.toLowerCase())
-  ) : [];
+  ) : []), [interviewData.status, techStackSearchTerm]);
 
   // Handler to add a tech stack
   const addTechStack = (tech: string) => {
@@ -314,7 +313,7 @@ export default function Component() {
   // Reset highlighted index when dropdown items change
   useEffect(() => {
     if (filteredJobRoles.length > 0 && isJobRoleDropdownOpen) {
-      setHighlightedJobRoleIndex(highlightedJobRoleIndex < filteredJobRoles.length ? highlightedJobRoleIndex : 0);
+      setHighlightedJobRoleIndex(prev => (prev < filteredJobRoles.length ? prev : 0));
     } else {
       setHighlightedJobRoleIndex(-1);
     }
@@ -322,7 +321,7 @@ export default function Component() {
 
   useEffect(() => {
     if (filteredTechStacks.length > 0 && isTechStackDropdownOpen) {
-      setHighlightedTechStackIndex(highlightedTechStackIndex < filteredTechStacks.length ? highlightedTechStackIndex : 0);
+      setHighlightedTechStackIndex(prev => (prev < filteredTechStacks.length ? prev : 0));
     } else {
       setHighlightedTechStackIndex(-1);
     }
@@ -353,7 +352,7 @@ export default function Component() {
             // Second tab change - end interview
             console.log("Second tab change detected, ending interview");
             setIsTabEndModalOpen(true); // Set this before calling endInterviewDueToTabChange
-            endInterviewDueToTabChange();
+            actionsRef.current.endInterviewDueToTabChange();
           }
         }
       };
@@ -567,12 +566,6 @@ export default function Component() {
   }, []);
 
   // Handler to add or remove topics from the selected list
-  const toggleTopic = (topic: string) => {
-    setSelectedTopics(prev =>
-      prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic]
-    )
-  }
-
   // Add this function to validate the job role and tech stack
   const validateInterviewInputs = () => {
     const errors: {jobRole?: string, techStack?: string} = {};
@@ -691,7 +684,7 @@ export default function Component() {
   };
 
   // Handle audio recording complete
-  const handleAudioAnalysisComplete = (analysis: any) => {
+  const handleAudioAnalysisComplete = (analysis: ResponseEvaluation) => {
     setAudioAnalysis(analysis);
     if (analysis.transcript) {
       setResponseTranscript(analysis.transcript);
@@ -699,7 +692,7 @@ export default function Component() {
   };
 
   // Handle video recording complete
-  const handleVideoAnalysisComplete = (analysis: any) => {
+  const handleVideoAnalysisComplete = (analysis: ResponseEvaluation) => {
     setVideoAnalysis(analysis);
     if (analysis.transcript) {
       setResponseTranscript(analysis.transcript);
@@ -825,7 +818,7 @@ export default function Component() {
       .then(stream => {
         stream.getTracks().forEach(track => track.stop());
       })
-      .catch(err => {
+      .catch(() => {
         // This error is expected if no media is active, so we can ignore it
       });
   };
@@ -1097,7 +1090,7 @@ export default function Component() {
             setIsTimerRunning(false);
             setIsTimeUpModalOpen(true);
             // Add function to handle time-up scenario
-            handleTimeUp();
+            actionsRef.current.handleTimeUp();
             return 0;
           }
           return prev - 1;
@@ -1215,10 +1208,12 @@ export default function Component() {
   // Add this to save interview when it's complete
   useEffect(() => {
     // When interview is complete and has feedback, save it to history
-    if (interviewData.status === 'complete' && interviewData.overallFeedback) {
-      saveInterviewToHistory();
+    if (interviewData.status === 'complete') {
+      actionsRef.current.saveInterviewToHistory();
     }
   }, [interviewData.status]);
+
+  actionsRef.current = { endInterviewDueToTabChange, handleTimeUp, saveInterviewToHistory };
 
   // Function to view a specific interview history item
   const viewHistoryItem = (item: InterviewHistoryItem) => {
@@ -1848,7 +1843,7 @@ export default function Component() {
                       />
                       <Button 
                         className="w-full bg-purple-600 hover:bg-purple-700"
-                        onClick={(e) => {
+                        onClick={() => {
                           handleSubmitAnswer(currentAnswer);
                         }}
                         disabled={interviewData.isLoading}
@@ -2008,7 +2003,7 @@ export default function Component() {
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                         <div className="bg-white rounded-lg p-4 text-center shadow-sm">
                           <div className="text-3xl font-bold text-purple-800">
-                            {interviewData.overallFeedback.overall_score?.total || interviewData.overallFeedback.overall_score || 0}/10
+                            {interviewData.overallFeedback.overall_score?.total ?? 0}/10
                           </div>
                           <div className="text-sm text-gray-600">Total Score</div>
                         </div>
@@ -2057,7 +2052,7 @@ export default function Component() {
                             Key Strengths
                           </h4>
                           <ul className="space-y-2">
-                            {interviewData.overallFeedback.key_strengths.map((strength: string, index: number) => (
+                            {(interviewData.overallFeedback.key_strengths ?? []).map((strength: string, index: number) => (
                               <li key={index} className="bg-white p-3 rounded-lg border-l-4 border-green-400">
                                 {strength}
                               </li>
@@ -2071,7 +2066,7 @@ export default function Component() {
                             Areas for Improvement
                           </h4>
                           <ul className="space-y-2">
-                            {interviewData.overallFeedback.key_weaknesses.map((weakness: string, index: number) => (
+                            {(interviewData.overallFeedback.key_weaknesses ?? []).map((weakness: string, index: number) => (
                               <li key={index} className="bg-white p-3 rounded-lg border-l-4 border-amber-400">
                                 {weakness}
                               </li>
@@ -2113,7 +2108,7 @@ export default function Component() {
                               <h4 className="font-medium text-purple-800">Question {index + 1}</h4>
                               {question.evaluation && (
                                 <span className="px-2 py-1 bg-purple-100 rounded text-purple-800 text-sm">
-                                  Score: {question.evaluation.score?.overall || question.evaluation.score || 0}/10
+                                  Score: {question.evaluation.score?.overall ?? 0}/10
                                 </span>
                               )}
                             </div>
@@ -2131,7 +2126,7 @@ export default function Component() {
                               <div>
                                 <p className="text-purple-800 font-medium text-sm mb-1">Feedback:</p>
                                 <p className="text-gray-700 text-sm">
-                                  {question.evaluation.feedback?.summary || question.evaluation.feedback}
+                                  {question.evaluation.feedback?.summary}
                                 </p>
                                 
                                 {question.evaluation.feedback?.improvement_tips && (
@@ -2155,7 +2150,7 @@ export default function Component() {
                     {interviewData.overallFeedback.question_specific_feedback && (
                       <CollapsibleSection title="Question-Specific Insights">
                         <div className="space-y-3">
-                          {interviewData.overallFeedback.question_specific_feedback.map((feedback: any, index: number) => (
+                          {interviewData.overallFeedback.question_specific_feedback.map((feedback: QuestionFeedback, index: number) => (
                             <div key={index} className="bg-white p-4 rounded-lg border border-purple-100">
                               <p className="text-purple-800 font-medium mb-1">Question {feedback.question_number}</p>
                               <p className="text-gray-700 mb-2"><span className="font-medium">Highlights:</span> {feedback.highlights}</p>
@@ -2207,9 +2202,9 @@ export default function Component() {
                       <div className="flex justify-center">
                         <div className={`
                           px-6 py-3 rounded-full font-bold text-lg 
-                          ${interviewData.overallFeedback.hire_recommendation.includes('Strong') ? 'bg-green-100 text-green-800' : 
-                            interviewData.overallFeedback.hire_recommendation.includes('Hire') ? 'bg-blue-100 text-blue-800' : 
-                            interviewData.overallFeedback.hire_recommendation.includes('Consider') ? 'bg-yellow-100 text-yellow-800' : 
+                          ${interviewData.overallFeedback.hire_recommendation?.includes('Strong') ? 'bg-green-100 text-green-800' : 
+                            interviewData.overallFeedback.hire_recommendation?.includes('Hire') ? 'bg-blue-100 text-blue-800' : 
+                            interviewData.overallFeedback.hire_recommendation?.includes('Consider') ? 'bg-yellow-100 text-yellow-800' : 
                             'bg-red-100 text-red-800'}
                         `}>
                           {interviewData.overallFeedback.hire_recommendation}
@@ -2416,7 +2411,7 @@ export default function Component() {
                         <div className="mt-2 flex items-center">
                           <span className="text-sm font-medium text-gray-700 mr-2">Score:</span>
                           <span className="font-medium text-purple-700">
-                            {item.overallFeedback.overall_score?.total || item.overallFeedback.overall_score || 0}/10
+                            {item.overallFeedback.overall_score?.total ?? 0}/10
                           </span>
                         </div>
                       </li>
@@ -2445,7 +2440,7 @@ export default function Component() {
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                         <div className="bg-white rounded-lg p-3 text-center shadow-sm">
                           <div className="text-2xl font-bold text-purple-800">
-                            {selectedHistoryItem.overallFeedback.overall_score?.total || selectedHistoryItem.overallFeedback.overall_score || 0}/10
+                            {selectedHistoryItem.overallFeedback.overall_score?.total ?? 0}/10
                           </div>
                           <div className="text-xs text-gray-600">Total Score</div>
                         </div>
@@ -2490,7 +2485,7 @@ export default function Component() {
                           <div>
                             <h4 className="font-medium text-purple-700 mb-2">Key Strengths</h4>
                             <ul className="space-y-1">
-                              {selectedHistoryItem.overallFeedback.key_strengths.map((strength: string, index: number) => (
+                              {(selectedHistoryItem.overallFeedback.key_strengths ?? []).map((strength: string, index: number) => (
                                 <li key={index} className="bg-white p-2 rounded border-l-4 border-green-400 text-sm">
                                   {strength}
                                 </li>
@@ -2501,7 +2496,7 @@ export default function Component() {
                           <div>
                             <h4 className="font-medium text-purple-700 mb-2">Areas for Improvement</h4>
                             <ul className="space-y-1">
-                              {selectedHistoryItem.overallFeedback.key_weaknesses.map((weakness: string, index: number) => (
+                              {(selectedHistoryItem.overallFeedback.key_weaknesses ?? []).map((weakness: string, index: number) => (
                                 <li key={index} className="bg-white p-2 rounded border-l-4 border-amber-400 text-sm">
                                   {weakness}
                                 </li>
@@ -2519,7 +2514,7 @@ export default function Component() {
                                 <h4 className="font-medium text-purple-800 text-sm">Question {index + 1}</h4>
                                 {question.evaluation && (
                                   <span className="px-2 py-0.5 bg-purple-100 rounded text-purple-800 text-xs">
-                                    Score: {question.evaluation.score?.overall || question.evaluation.score || 0}/10
+                                    Score: {question.evaluation.score?.overall ?? 0}/10
                                   </span>
                                 )}
                               </div>
@@ -2537,7 +2532,7 @@ export default function Component() {
                                 <div>
                                   <p className="text-purple-800 font-medium text-xs mb-1">Feedback:</p>
                                   <p className="text-gray-700 text-xs">
-                                    {question.evaluation.feedback?.summary || question.evaluation.feedback}
+                                    {question.evaluation.feedback?.summary}
                                   </p>
                                 </div>
                               )}
@@ -2551,9 +2546,9 @@ export default function Component() {
                         <div className="flex justify-center">
                           <div className={`
                             px-4 py-2 rounded-full font-bold text-sm
-                            ${selectedHistoryItem.overallFeedback.hire_recommendation.includes('Strong') ? 'bg-green-100 text-green-800' : 
-                              selectedHistoryItem.overallFeedback.hire_recommendation.includes('Hire') ? 'bg-blue-100 text-blue-800' : 
-                              selectedHistoryItem.overallFeedback.hire_recommendation.includes('Consider') ? 'bg-yellow-100 text-yellow-800' : 
+                            ${selectedHistoryItem.overallFeedback.hire_recommendation?.includes('Strong') ? 'bg-green-100 text-green-800' : 
+                              selectedHistoryItem.overallFeedback.hire_recommendation?.includes('Hire') ? 'bg-blue-100 text-blue-800' : 
+                              selectedHistoryItem.overallFeedback.hire_recommendation?.includes('Consider') ? 'bg-yellow-100 text-yellow-800' : 
                               'bg-red-100 text-red-800'}
                           `}>
                             {selectedHistoryItem.overallFeedback.hire_recommendation}

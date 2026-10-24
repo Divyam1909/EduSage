@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -34,13 +33,13 @@ export default function TeacherForgotPasswordPage() {
       } else {
         setError(data.message || "Failed to send reset link");
       }
-    } catch (err) {
+    } catch {
       setError("Server error. Please try again later.");
     }
   };
 
   useEffect(() => {
-    let timer;
+    let timer: ReturnType<typeof setInterval> | undefined;
     if (isLinkSent && seconds > 0) {
       timer = setInterval(() => {
         setSeconds((prevSeconds) => prevSeconds - 1);

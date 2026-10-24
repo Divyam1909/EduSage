@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../utils/api";
 import { BookOpen, Calendar, User, ListChecks, FileText } from "lucide-react";
+import type { Quiz } from "@/types";
 
 const SUBJECTS = ["MES", "OS", "CN", "EM-4", "SE"];
 const DIFFICULTY = ["Novice", "Adept", "Sage"];
@@ -19,9 +19,9 @@ interface Question {
 }
 
 export default function TeacherQuizzes() {
-  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [editQuiz, setEditQuiz] = useState<any>(null);
+  const [editQuiz, setEditQuiz] = useState<Quiz | null>(null);
   const [form, setForm] = useState({
     title: "",
     topic: SUBJECTS[0],
@@ -47,9 +47,9 @@ export default function TeacherQuizzes() {
     try {
       const res = await apiFetch("/api/quizzes");
       setQuizzes(await res.json());
-    } catch (e) { setError("Failed to load quizzes"); }
+    } catch { setError("Failed to load quizzes"); }
   }
-  function openModal(quiz: any = null) {
+  function openModal(quiz: Quiz | null = null) {
     setEditQuiz(quiz);
     if (quiz) {
       setForm({
@@ -58,7 +58,7 @@ export default function TeacherQuizzes() {
         difficulty: quiz.difficulty,
         timeLimit: quiz.timeLimit,
         points: quiz.points,
-        questions: quiz.questions,
+        questions: quiz.questions.map((q) => ({ ...q, correctAnswer: q.correctAnswer ?? "" })),
         clearable: quiz.clearable ?? true,
       });
     } else {
@@ -100,15 +100,15 @@ export default function TeacherQuizzes() {
       } else {
         setError("Failed to save quiz");
       }
-    } catch (e) { setError("Failed to save quiz"); }
+    } catch { setError("Failed to save quiz"); }
   }
-  async function handleDelete(id: any) {
+  async function handleDelete(id: string) {
     if (!window.confirm("Delete this quiz?")) return;
     try {
       const res = await apiFetch(`/api/quizzes/${id}`, { method: "DELETE" });
       if (res.ok) fetchQuizzes();
       else setError("Failed to delete quiz");
-    } catch (e) { setError("Failed to delete quiz"); }
+    } catch { setError("Failed to delete quiz"); }
   }
   function handleAddQuestion() {
     if (!questionForm.questionText || !questionForm.correctAnswer) {

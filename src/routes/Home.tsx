@@ -1,6 +1,5 @@
-//@ts-nocheck
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { apiClient } from "../utils/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,17 +27,18 @@ import {
 } from "lucide-react";
 import { formatDate, getInitials, LEVELS, calculateLevel } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
+import type { ForumQuestion, PendingNotification, SubjectMark, TopSage } from "@/types";
 
 export default function Home() {
-  const { userData, isLoading, refreshUserData, userRankData, fetchUserRankings } = useUser();
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [subjectMarks, setSubjectMarks] = useState<any[]>([]);
+  const { userData, refreshUserData, userRankData, fetchUserRankings } = useUser();
+  const [questions, setQuestions] = useState<ForumQuestion[]>([]);
+  const [subjectMarks, setSubjectMarks] = useState<SubjectMark[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [topSages, setTopSages] = useState<any[]>([]);
+  const [topSages, setTopSages] = useState<TopSage[]>([]);
   const [openSubjects, setOpenSubjects] = useState<{ [key: string]: boolean }>({});
   // Notification related states:
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [toasts, setToasts] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<PendingNotification[]>([]);
+  const [toasts, setToasts] = useState<PendingNotification[]>([]);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   // New state for class stats (class average and rank)
   const [classStats, setClassStats] = useState({ classAverageResult: 0 });
@@ -49,7 +49,6 @@ export default function Home() {
   const [loadingMarks, setLoadingMarks] = useState(true);
   const [loadingSages, setLoadingSages] = useState(true);
 
-  const navigate = useNavigate();
   const location = useLocation();
 
   // Fetch top sages
@@ -58,7 +57,7 @@ export default function Home() {
       try {
         const { data } = await apiClient.get("/api/top-sages");
         setTopSages(data);
-      } catch (err) {
+      } catch {
         // Silent error
       } finally {
         setLoadingSages(false);
@@ -82,7 +81,7 @@ export default function Home() {
       } else {
         setSubjectMarks([]);
       }
-    } catch (err) {
+    } catch {
       setSubjectMarks([]);
     } finally {
       setLoadingMarks(false);
@@ -95,7 +94,7 @@ export default function Home() {
       try {
         const { data } = await apiClient.get("/api/questions");
         setQuestions(data);
-      } catch (error) {
+      } catch {
         // Silent error
       } finally {
         setLoadingQuestions(false);
@@ -117,7 +116,7 @@ export default function Home() {
       setClassStats({ 
         classAverageResult: data.classAverageResult || 0
       });
-    } catch (err) {
+    } catch {
       // Silent error handling
     }
   }, [userData]);
@@ -188,11 +187,11 @@ export default function Home() {
           // Process any pending notifications
           setNotifications(prev => {
             const newNotifications = data.filter(
-              (notification: any) => !prev.some(n => 
+              (notification: PendingNotification) => !prev.some(n => 
                 n.id === notification.id || 
                 (n.eventId === notification.eventId && n.type === notification.type)
               )
-            ).map((notification: any) => ({
+            ).map((notification: PendingNotification) => ({
               ...notification,
               id: notification.id || Date.now() + "_" + notification.eventId + "_" + notification.type,
               seen: false
@@ -204,11 +203,11 @@ export default function Home() {
           // Also add to toasts for immediate visibility
           setToasts(prev => {
             const newToasts = data.filter(
-              (notification: any) => !prev.some(t => 
+              (notification: PendingNotification) => !prev.some(t => 
                 t.id === notification.id || 
                 (t.eventId === notification.eventId && t.type === notification.type)
               )
-            ).map((notification: any) => ({
+            ).map((notification: PendingNotification) => ({
               ...notification,
               id: notification.id || Date.now() + "_" + notification.eventId + "_" + notification.type,
             }));
@@ -216,7 +215,7 @@ export default function Home() {
             return [...prev, ...newToasts];
           });
         }
-      } catch (err) {
+      } catch {
         // Silent error
       }
     };
@@ -248,7 +247,7 @@ export default function Home() {
     try {
       await apiClient.delete(`/api/user/stats/subject/${id}`);
       setSubjectMarks(prev => prev.filter(mark => mark._id !== id));
-    } catch (error) {
+    } catch {
       // Silent error
     }
   };
@@ -606,7 +605,7 @@ export default function Home() {
                   variant="ghost"
                   className="mt-2 text-purple-600"
                   onClick={() => {
-                    userData.showDetailedAnalysis = true;
+                    if (userData) userData.showDetailedAnalysis = true;
                     refreshUserData();
                   }}
                 >
@@ -669,7 +668,7 @@ export default function Home() {
                 <label className="block font-medium mb-1">Subject:</label>
                 <select
                   name="subject"
-                  onChange={(e) => {}}
+                  onChange={() => {}}
                   className="w-full p-2 border rounded mb-2"
                 >
                   <option value="">Select Subject</option>

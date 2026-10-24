@@ -21,7 +21,8 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': [
         'warn',
-        { allowConstantExport: true },
+        // Context hooks and shadcn variants intentionally live next to their components
+        { allowConstantExport: true, allowExportNames: ['useToast', 'useUser', 'buttonVariants'] },
       ],
     },
   },

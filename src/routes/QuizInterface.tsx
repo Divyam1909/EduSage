@@ -1,5 +1,4 @@
-//@ts-nocheck
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Users,
   FileText,
@@ -19,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../utils/api";
+import type { QuizAttemptAnswer, StudentProfile } from "@/types";
 
 // Define interfaces for our types
 interface Question {
@@ -66,7 +66,7 @@ interface QuizResult {
 
 export default function QuizInterface() {
   // User state and token retrieval
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<StudentProfile | null>(null);
   const token = localStorage.getItem("token");
 
   // Main view states
@@ -74,7 +74,7 @@ export default function QuizInterface() {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [attemptingQuiz, setAttemptingQuiz] = useState<boolean>(false);
   const [userAnswers, setUserAnswers] = useState<string[]>([]);
-  const [attemptDetails, setAttemptDetails] = useState<any[]>([]);
+  const [attemptDetails, setAttemptDetails] = useState<QuizAttemptAnswer[]>([]);
   const [startTime, setStartTime] = useState<number>(0);
   const [remainingTime, setRemainingTime] = useState<number>(0);
 
@@ -125,6 +125,8 @@ export default function QuizInterface() {
   // Timer state variables
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // Latest versions of callbacks used inside long-lived listeners and timers
+  const actionsRef = useRef({ endQuizDueToTabChange: () => {}, submitQuizAttempt: () => {} });
   
   // Fetch user profile similar to Home.tsx so that we have the correct identifier
   useEffect(() => {
@@ -140,31 +142,45 @@ export default function QuizInterface() {
     }
   }, [token]);
 
-  // Fetch quizzes and attempts on mount
-  useEffect(() => {
-    fetchQuizzes();
-  }, []);
+  const fetchQuizzes = useCallback(() => {
+    apiFetch("api/quizzes", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then((res) => res.json())
+      .then((data: Quiz[]) => setQuizzes(data))
+      .catch((err) => console.error("Error fetching quizzes:", err));
+  }, [token]);
 
-  // Make sure fetchAttempts is called when component mounts after user data is loaded
+  const fetchAttempts = useCallback(() => {
+    if (!userData || !userData.rollno) return;
+    
+    // The backend returns the attempts of the logged-in student
+    apiFetch("api/quizAttempts", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then((res) => res.json())
+      .then((data) => setAttempts(data))
+      .catch((err) => console.error("Error fetching attempts:", err));
+  }, [token, userData]);
+
+  // Load attempts once the profile is known, and refresh them whenever the
+  // attempts view is opened or closed
   useEffect(() => {
     if (userData && userData.rollno) {
       fetchAttempts();
     }
-  }, [userData]);
+  }, [userData, viewAttempts, fetchAttempts]);
 
-  // Ensure attempts are refreshed when view attempts is toggled
-  useEffect(() => {
-    if (viewAttempts && userData && userData.rollno) {
-      fetchAttempts();
-    }
-  }, [viewAttempts]);
-
-  // When user navigates back from attempts view, refresh quiz list
+  // Load quizzes on mount and whenever the user returns from the attempts view
   useEffect(() => {
     if (!viewAttempts) {
       fetchQuizzes();
     }
-  }, [viewAttempts]);
+  }, [viewAttempts, fetchQuizzes]);
 
   // Extra safety measure - refresh quizzes after attempts are fetched
   useEffect(() => {
@@ -172,7 +188,7 @@ export default function QuizInterface() {
       // If we have loaded attempts, refresh available quizzes
       fetchQuizzes();
     }
-  }, [attempts.length]);
+  }, [attempts.length, fetchQuizzes]);
 
   // Tab visibility detection
   useEffect(() => {
@@ -190,7 +206,7 @@ export default function QuizInterface() {
           } else if (newCount >= 2) {
             // Second tab change - end quiz
             console.log("Second tab change detected, ending quiz");
-            endQuizDueToTabChange();
+            actionsRef.current.endQuizDueToTabChange();
           }
         }
       };
@@ -201,31 +217,6 @@ export default function QuizInterface() {
       };
     }
   }, [attemptingQuiz, isTimerRunning, tabChangeCount]);
-
-  const fetchQuizzes = () => {
-    apiFetch("api/quizzes", {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    })
-      .then((res) => res.json())
-      .then((data: Quiz[]) => setQuizzes(data))
-      .catch((err) => console.error("Error fetching quizzes:", err));
-  };
-
-  const fetchAttempts = () => {
-    if (!userData || !userData.rollno) return;
-    
-    // Use the user's roll number instead of a hardcoded value
-    apiFetch(`api/quizAttempts?user=${userData.rollno}`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    })
-      .then((res) => res.json())
-      .then((data) => setAttempts(data))
-      .catch((err) => console.error("Error fetching attempts:", err));
-  };
 
   // Function to end quiz due to tab change
   const endQuizDueToTabChange = () => {
@@ -295,7 +286,7 @@ export default function QuizInterface() {
 
   // Timer effect: when attemptingQuiz becomes true, start countdown
   useEffect(() => {
-    let timer: any;
+    let timer: ReturnType<typeof setInterval> | undefined;
     if (attemptingQuiz && selectedQuiz) {
       setRemainingTime(selectedQuiz.timeLimit * 60);
       setIsTimerRunning(true);
@@ -303,7 +294,7 @@ export default function QuizInterface() {
         setRemainingTime((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            submitQuizAttempt();
+            actionsRef.current.submitQuizAttempt();
             return 0;
           }
           return prev - 1;
@@ -419,11 +410,13 @@ export default function QuizInterface() {
       });
   };
 
-  const handleNewQuizDetailChange = (field: keyof Omit<Quiz, "questions" | "_id">, value: any) => {
+  actionsRef.current = { endQuizDueToTabChange, submitQuizAttempt };
+
+  const handleNewQuizDetailChange = (field: keyof Omit<Quiz, "questions" | "_id">, value: string | number | boolean) => {
     setNewQuiz({ ...newQuiz, [field]: value });
   };
 
-  const handleQuestionChange = (index: number, field: keyof Question, value: any) => {
+  const handleQuestionChange = (index: number, field: keyof Question, value: string | number | boolean) => {
     const updatedQuestions = [...newQuiz.questions];
     updatedQuestions[index] = { ...updatedQuestions[index], [field]: value };
     setNewQuiz({ ...newQuiz, questions: updatedQuestions });
@@ -478,7 +471,7 @@ export default function QuizInterface() {
       body: JSON.stringify(quizToSubmit),
     })
       .then((res) => res.json())
-      .then((data) => {
+      .then(() => {
         showToast("Quiz created successfully!", "success");
         // Re–fetch quizzes so the new one is visible
         fetchQuizzes();
@@ -738,7 +731,7 @@ export default function QuizInterface() {
   const renderQuizResult = () => (
     <div className="bg-purple-50 p-8 min-h-screen">
       <h2 className="text-3xl font-bold text-purple-800 mb-4">Quiz Completed</h2>
-      {quizResult && (quizResult as any).tabViolation && (
+      {quizResult?.tabViolation && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <p className="font-bold">Tab Change Violation Detected</p>
           <p>Your quiz was automatically submitted due to changing tabs more than once.</p>
@@ -974,7 +967,7 @@ export default function QuizInterface() {
                 "Clear All Attempts",
                 "Are you sure you want to clear all clearable attempts? This cannot be undone.",
                 () => {
-                  apiFetch(`api/quizAttempts/clearAll?user=${userData.rollno}`, {
+                  apiFetch("api/quizAttempts/clearAll", {
                     method: "DELETE",
                     headers: {
                       Authorization: `Bearer ${token}`

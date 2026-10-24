@@ -1,12 +1,7 @@
-//@ts-nocheck
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { apiClient } from "../utils/api";
 import {
-  GraduationCap,
   FileText,
-  Menu,
-  BookOpen,
   Users,
   Calendar,
   Bot,
@@ -35,8 +30,6 @@ export default function Resources() {
   const [fileLink, setFileLink] = useState("");
   const [resources, setResources] = useState<Resource[]>([]);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
-  const [expandedTopic, setExpandedTopic] = useState<number | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
 
@@ -119,9 +112,6 @@ export default function Resources() {
     setFileLink(resource.fileLink);
   };
 
-  const toggleTopic = (index: number) => {
-    setExpandedTopic(expandedTopic === index ? null : index);
-  };
 
 
   // Handle bookmark toggle

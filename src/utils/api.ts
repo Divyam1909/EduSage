@@ -1,4 +1,3 @@
-//@ts-nocheck
 import axios from 'axios';
 
 // The backend is served from the same origin under /api: by a Vercel function in
@@ -47,7 +46,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   
   try {
     // Create headers object
-    const headers = { ...options.headers };
+    const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
 
     // Send the login token unless the caller set one explicitly
     const token = getAuthToken();
@@ -75,7 +74,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
           password: bodyObj.password ? '[REDACTED]' : undefined,
           realPassword: bodyObj.realPassword ? '[REDACTED]' : undefined
         });
-      } catch (e) {
+      } catch {
         console.log("Could not parse request body for logging");
       }
     }
@@ -95,7 +94,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
         const errorData = await response.json();
         errorText = JSON.stringify(errorData);
         console.error(`API error (${response.status}):`, errorData);
-      } catch (e) {
+      } catch {
         errorText = await response.text();
         console.error(`API error (${response.status}):`, errorText);
       }

@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { lazy } from "react";
 import { BookOpen, User, Calendar as CalendarIcon, ListChecks, FileText } from "lucide-react";
 import { Link } from "react-router-dom";

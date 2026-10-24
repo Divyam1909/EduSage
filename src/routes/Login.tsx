@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import {
@@ -62,14 +61,14 @@ export default function Login() {
     } catch (error) {
       console.error("Login error:", error);
       setError("Server error occurred. Please try again later.");
-      setDebugInfo(`Error details: ${error.message}`);
+      setDebugInfo(`Error details: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsSubmitting(false);
     }
   };
   
   // Handle Enter key press to trigger login
-  const handleKeyPress = (e: { key: string; }) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleLogin(e);
     }

@@ -1,5 +1,5 @@
-//@ts-nocheck
 import React, { useState } from 'react';
+import type { ResponseEvaluation } from "@/types/interview";
 import { useReactMediaRecorder } from 'react-media-recorder';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2 } from 'lucide-react';
@@ -7,7 +7,7 @@ import { analyzeAudioResponse } from '@/utils/audioTranscription';
 
 interface AudioRecorderProps {
   question: string;
-  onRecordingComplete: (analysis: any) => void;
+  onRecordingComplete: (analysis: ResponseEvaluation) => void;
   onTranscriptReceived?: (transcript: string) => void;
 }
 
@@ -51,7 +51,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   };
 
-  const handleRecordingComplete = async (blobUrl: string, blob: Blob) => {
+  const handleRecordingComplete = async (_blobUrl: string, blob: Blob) => {
     try {
       setIsAnalyzing(true);
       

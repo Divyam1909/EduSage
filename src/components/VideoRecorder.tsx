@@ -1,5 +1,5 @@
-//@ts-nocheck
 import React, { useState, useRef, useEffect } from 'react';
+import type { ResponseEvaluation } from "@/types/interview";
 import { useReactMediaRecorder } from 'react-media-recorder';
 import { Button } from '@/components/ui/button';
 import { Video, Square, Loader2 } from 'lucide-react';
@@ -7,7 +7,7 @@ import { analyzeVideoResponse } from '@/utils/videoTranscription';
 
 interface VideoRecorderProps {
   question: string;
-  onRecordingComplete: (analysis: any) => void;
+  onRecordingComplete: (analysis: ResponseEvaluation) => void;
   onTranscriptReceived?: (transcript: string) => void;
   questionIndex?: number;
 }
@@ -24,6 +24,8 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({
   const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  // Latest camera state and helpers, so effects and unmount cleanup never act on stale values
+  const latestRef = useRef({ cameraStream, timerId, initCamera: async () => {}, stopCamera: () => {}, clearBlobUrl: () => {} });
 
   const {
     status,
@@ -40,36 +42,38 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({
   });
 
   useEffect(() => {
+    const latest = latestRef.current;
     setIsAnalyzing(false);
     setTranscript('');
     setRecordingTime(0);
-    if (timerId) {
-      clearInterval(timerId);
+    if (latest.timerId) {
+      clearInterval(latest.timerId);
       setTimerId(null);
     }
     
-    clearBlobUrl();
+    latest.clearBlobUrl();
     
-    if (!cameraStream && videoPreviewRef.current) {
-      initCamera();
+    if (!latest.cameraStream && videoPreviewRef.current) {
+      latest.initCamera();
     }
   }, [question, questionIndex]);
 
   useEffect(() => {
-    initCamera();
-    
+    const video = videoPreviewRef.current;
+    latestRef.current.initCamera();
+
     return () => {
       console.log("VideoRecorder is unmounting - stopping camera");
-      stopCamera();
-      
-      if (videoPreviewRef.current) {
-        videoPreviewRef.current.srcObject = null;
-        videoPreviewRef.current.load();
+      // Read the latest stream and timer: the values from the first render are stale
+      latestRef.current.stopCamera();
+
+      if (video) {
+        video.srcObject = null;
+        video.load();
       }
-      
-      if (timerId) {
-        clearInterval(timerId);
-        setTimerId(null);
+
+      if (latestRef.current.timerId) {
+        clearInterval(latestRef.current.timerId);
       }
     };
   }, []);
@@ -106,9 +110,11 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({
     }
   };
 
+  latestRef.current = { cameraStream, timerId, initCamera, stopCamera, clearBlobUrl };
+
   useEffect(() => {
     if (!isAnalyzing && transcript) {
-      clearBlobUrl();
+      latestRef.current.clearBlobUrl();
     }
   }, [isAnalyzing, transcript]);
 
@@ -128,7 +134,7 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({
     }
   };
 
-  const handleRecordingComplete = async (blobUrl: string, blob: Blob) => {
+  const handleRecordingComplete = async (_blobUrl: string, blob: Blob) => {
     try {
       setIsAnalyzing(true);
       

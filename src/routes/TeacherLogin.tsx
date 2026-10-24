@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import {
@@ -20,7 +19,6 @@ export default function TeacherLogin() {
   const navigate = useNavigate();
   const [teacherId, setTeacherId] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,7 +39,7 @@ export default function TeacherLogin() {
       } else {
         setError(data.message || "Invalid credentials");
       }
-    } catch (error) {
+    } catch {
       setError("Server error occurred. Please try again later.");
     } finally {
       setIsSubmitting(false);
@@ -51,7 +49,7 @@ export default function TeacherLogin() {
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleLogin(e as any);
+      handleLogin(e);
     }
   };
 
@@ -107,6 +105,7 @@ export default function TeacherLogin() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
+            {error && <p className="w-full text-sm text-red-600">{error}</p>}
             <Button
               className="w-full bg-purple-600 hover:bg-purple-700 text-white"
               onClick={handleLogin}

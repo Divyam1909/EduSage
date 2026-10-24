@@ -1,5 +1,4 @@
-//@ts-nocheck
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Bookmark,
   Bot,
@@ -15,19 +14,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { BookOpen } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
 import { Checkbox } from "@/components/ui/checkbox";
 import AILoader from "@/components/AILoader";
 import { useToast } from "@/components/ToastContainer";
+import type { AxiosError } from "axios";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { apiClient } from "../utils/api";
 import { useUser } from "../context/UserContext";
@@ -53,7 +44,7 @@ interface Event {
 
 export default function CalendarComponent() {
   const navigate = useNavigate();
-  const { userData, isLoading: userLoading } = useUser();
+  const { userData } = useUser();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -125,7 +116,7 @@ export default function CalendarComponent() {
         showToast("Invalid authentication token. Please log in again.", "error");
         navigate("/login");
       }
-    } catch (error) {
+    } catch {
       localStorage.removeItem("token");
       showToast("Invalid authentication token. Please log in again.", "error");
       navigate("/login");
@@ -133,9 +124,11 @@ export default function CalendarComponent() {
   }, [navigate, showToast]);
 
   // Fetch events from the backend
+  // Latest refreshEvents, so the effect below re-runs only when the user changes
+  const refreshEventsRef = useRef(() => {});
   useEffect(() => {
     if (userData) {
-      refreshEvents();
+      refreshEventsRef.current();
     }
   }, [userData]);
 
@@ -154,7 +147,7 @@ export default function CalendarComponent() {
         }
       })
       .then((response) => {
-        const transformed = response.data.map((ev: any) => ({
+        const transformed = response.data.map((ev: Omit<Event, "id"> & { _id: string }) => ({
           ...ev,
           id: ev._id,
         }));
@@ -170,6 +163,8 @@ export default function CalendarComponent() {
         }
       });
   };
+
+  refreshEventsRef.current = refreshEvents;
 
   const handleAddEvent = async () => {
     if (!newEvent.title || !newEvent.date) {
@@ -234,7 +229,8 @@ export default function CalendarComponent() {
       });
       setIsEditMode(false);
       showToast("Event added successfully", "success");
-    } catch (error) {
+    } catch (err) {
+      const error = err as AxiosError<{ error?: string }>;
       console.error("Error adding event:", error);
       let errorMessage = "Failed to add event";
       
@@ -315,7 +311,8 @@ export default function CalendarComponent() {
       setSelectedEvent(null);
       setIsEditMode(false);
       showToast("Event updated successfully", "success");
-    } catch (error) {
+    } catch (err) {
+      const error = err as AxiosError<{ error?: string }>;
       console.error("Error updating event:", error);
       if (error.response && error.response.status === 401) {
         showToast("Your session has expired. Please log in again.", "error");
@@ -354,7 +351,8 @@ export default function CalendarComponent() {
       setIsModalOpen(false);
       setSelectedEvent(null);
       showToast("Event deleted successfully", "success");
-    } catch (error) {
+    } catch (err) {
+      const error = err as AxiosError<{ error?: string }>;
       console.error("Error deleting event:", error);
       if (error.response && error.response.status === 401) {
         showToast("Your session has expired. Please log in again.", "error");
@@ -411,7 +409,8 @@ export default function CalendarComponent() {
       
       // Refresh events after deletion
       refreshEvents();
-    } catch (error) {
+    } catch (err) {
+      const error = err as AxiosError<{ error?: string }>;
       console.error('Error deleting PDF events:', error);
       if (error.response && error.response.status === 401) {
         showToast("Your session has expired. Please log in again.", "error");
@@ -469,7 +468,8 @@ export default function CalendarComponent() {
       setShowUploadModal(false);
       setSelectedFile(null);
       refreshEvents();
-    } catch (error) {
+    } catch (err) {
+      const error = err as AxiosError<{ error?: string }>;
       console.error("Error uploading PDF:", error);
       setUploadProgress({ 
         status: 'error', 
@@ -768,7 +768,7 @@ export default function CalendarComponent() {
                 <div className="flex-1 overflow-y-auto p-1 space-y-1">
                   {dayEvents.length > 0 && (
                     <>
-                      {dayEvents.slice(0, 2).map((event, idx) => (
+                      {dayEvents.slice(0, 2).map((event) => (
                         <div 
                           key={event.id} 
                           className="text-xs p-1 bg-purple-600 text-white rounded overflow-hidden overflow-ellipsis whitespace-nowrap"
@@ -932,7 +932,7 @@ export default function CalendarComponent() {
                     month: "long",
                     day: "numeric",
                   });
-                } catch (err) {
+                } catch {
                   return "Invalid date";
                 }
               })()}

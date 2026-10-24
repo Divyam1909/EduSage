@@ -1,28 +1,30 @@
-//@ts-nocheck
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../utils/api";
-import { Users, FileText, BookOpen, Calendar, User, ListChecks, BarChart2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, LineChart, Line } from 'recharts';
+import { FileText, BookOpen, Calendar, User, ListChecks, BarChart2 } from "lucide-react";
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
+import type { LeaderboardEntry, QuizAttempt, StudentProfile, SubjectAverage, SubjectMark } from "@/types";
+
+// Mark inputs are edited as text; the backend stores them as numbers
+type MarkForm = Pick<SubjectMark, "subject"> & Record<"cia1" | "cia2" | "midSem" | "endSem", string | number>;
 
 const SUBJECTS = ["MES", "OS", "CN", "EM-4", "SE"];
 
 export default function TeacherStudents() {
-  const [students, setStudents] = useState<any[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [marks, setMarks] = useState<any[]>([]);
-  const [quizAttempts, setQuizAttempts] = useState<any[]>([]);
+  const [students, setStudents] = useState<StudentProfile[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
+  const [marks, setMarks] = useState<SubjectMark[]>([]);
+  const [quizAttempts, setQuizAttempts] = useState<QuizAttempt[]>([]);
   const [showMarksModal, setShowMarksModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [showAddEditMarkModal, setShowAddEditMarkModal] = useState(false);
-  const [editMark, setEditMark] = useState<any>(null);
-  const [markForm, setMarkForm] = useState({ subject: "", cia1: "", cia2: "", midSem: "", endSem: "" });
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [classGraph, setClassGraph] = useState<any[]>([]);
+  const [editMark, setEditMark] = useState<SubjectMark | null>(null);
+  const [markForm, setMarkForm] = useState<MarkForm>({ subject: "", cia1: "", cia2: "", midSem: "", endSem: "" });
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [classGraph, setClassGraph] = useState<SubjectAverage[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -35,44 +37,48 @@ export default function TeacherStudents() {
     try {
       const res = await apiFetch("/api/teacher/students", { headers: { Authorization: `Bearer ${localStorage.getItem("teacherToken")}` } });
       setStudents(await res.json());
-    } catch (e) { setError("Failed to load students"); }
+    } catch { setError("Failed to load students"); }
   }
   async function fetchLeaderboard() {
     try {
       const res = await apiFetch("/api/teacher/class/leaderboard", { headers: { Authorization: `Bearer ${localStorage.getItem("teacherToken")}` } });
       setLeaderboard(await res.json());
-    } catch (e) {}
+    } catch {
+      // Keep the current data if this request fails
+    }
   }
   async function fetchClassGraph() {
     try {
       const res = await apiFetch("/api/teacher/class/graph", { headers: { Authorization: `Bearer ${localStorage.getItem("teacherToken")}` } });
       setClassGraph(await res.json());
-    } catch (e) {}
+    } catch {
+      // Keep the current data if this request fails
+    }
   }
-  async function fetchMarks(rollno: any) {
+  async function fetchMarks(rollno: string) {
     try {
       const res = await apiFetch(`/api/teacher/students/${rollno}/marks`, { headers: { Authorization: `Bearer ${localStorage.getItem("teacherToken")}` } });
       setMarks(await res.json());
-    } catch (e) { setError("Failed to load marks"); }
+    } catch { setError("Failed to load marks"); }
   }
-  async function fetchQuizAttempts(rollno: any) {
+  async function fetchQuizAttempts(rollno: string) {
     try {
       const res = await apiFetch(`/api/teacher/students/${rollno}/quizAttempts`, { headers: { Authorization: `Bearer ${localStorage.getItem("teacherToken")}` } });
       setQuizAttempts(await res.json());
-    } catch (e) { setError("Failed to load quiz attempts"); }
+    } catch { setError("Failed to load quiz attempts"); }
   }
 
-  function openMarksModal(student: any) {
+  function openMarksModal(student: StudentProfile) {
     setSelectedStudent(student);
     fetchMarks(student.rollno);
     setShowMarksModal(true);
   }
-  function openQuizModal(student: any) {
+  function openQuizModal(student: StudentProfile) {
     setSelectedStudent(student);
     fetchQuizAttempts(student.rollno);
     setShowQuizModal(true);
   }
-  function openAddEditMarkModal(mark: any) {
+  function openAddEditMarkModal(mark: SubjectMark | null) {
     setEditMark(mark);
     setMarkForm(mark ? { ...mark } : { subject: "", cia1: "", cia2: "", midSem: "", endSem: "" });
     setShowAddEditMarkModal(true);
@@ -93,9 +99,9 @@ export default function TeacherStudents() {
       } else {
         setError("Failed to save mark");
       }
-    } catch (e) { setError("Failed to save mark"); }
+    } catch { setError("Failed to save mark"); }
   }
-  async function handleDeleteMark(id: any) {
+  async function handleDeleteMark(id: string) {
     if (!selectedStudent) return;
     if (!window.confirm("Delete this mark?")) return;
     try {
@@ -105,7 +111,7 @@ export default function TeacherStudents() {
       });
       if (res.ok) fetchMarks(selectedStudent.rollno);
       else setError("Failed to delete mark");
-    } catch (e) { setError("Failed to delete mark"); }
+    } catch { setError("Failed to delete mark"); }
   }
 
   return (
@@ -254,7 +260,7 @@ export default function TeacherStudents() {
                   <tbody>
                     {quizAttempts.map((attempt) => (
                       <tr key={attempt._id} className="border-b hover:bg-purple-50">
-                        <td className="p-3">{attempt.quizId?.title}</td>
+                        <td className="p-3">{typeof attempt.quizId === "object" ? attempt.quizId?.title : ""}</td>
                         <td className="p-3">{attempt.totalScore}</td>
                         <td className="p-3">{attempt.timeTaken} s</td>
                       </tr>
