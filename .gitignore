@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+backend/uploads/
+backend/logs/
+
+# Build artifacts
+*.tsbuildinfo

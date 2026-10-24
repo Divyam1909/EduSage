@@ -2,7 +2,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize the Gemini API with the API key from environment variables
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "REDACTED_GEMINI_KEY";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Use gemini-1.5-flash model for transcription and analysis
