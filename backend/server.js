@@ -36,6 +36,45 @@ const uploadHandler = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
+// Connect to MongoDB with improved connection options. A failed attempt is
+// cleared so the next request retries instead of staying disconnected.
+let dbConnection = null;
+function connectToDatabase() {
+  if (!dbConnection) {
+    dbConnection = mongoose
+      .connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 5000, // Timeout after 5s
+        socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+        family: 4 // Use IPv4, skip trying IPv6
+      })
+      .then(() => {
+        console.log("MongoDB connected");
+        if (IS_SERVERLESS) return;
+        // Start the notification checker after DB connection is established
+        startNotificationChecker();
+
+        // Update questionsAsked field for all users
+        updateQuestionsAskedForAllUsers();
+      })
+      .catch((err) => {
+        console.error("MongoDB connection error:", err);
+        dbConnection = null;
+        throw err;
+      });
+  }
+  return dbConnection;
+}
+
+// Make sure the database is connected before handling any request
+app.use(async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    res.status(503).json({ message: "Database unavailable, please try again" });
+  }
+});
+
 // Add compression middleware for all routes
 app.use(compression());
 
@@ -143,23 +182,8 @@ app.get('/api/users/:rollno/profile-image', async (req, res) => {
   }
 });
 
-// Connect to MongoDB with improved connection options
-mongoose
-  .connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 5000, // Timeout after 5s
-    socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-    family: 4 // Use IPv4, skip trying IPv6
-  })
-  .then(() => {
-    console.log("MongoDB connected");
-    if (IS_SERVERLESS) return;
-    // Start the notification checker after DB connection is established
-    startNotificationChecker();
-    
-    // Update questionsAsked field for all users
-    updateQuestionsAskedForAllUsers();
-  })
-  .catch((err) => console.error("MongoDB connection error:", err));
+// Start connecting eagerly; requests also wait on (and retry) the connection
+connectToDatabase().catch(() => {});
 
 /** ========== MODELS ========== **/
 // Models are now required from their separate files
