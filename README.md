@@ -211,7 +211,7 @@ cd backend
 npm install
 
 # Create the single .env file in the project root (used by frontend and backend)
-# cp .env.example .env   then fill in MONGO_URI, JWT_SECRET, VITE_GEMINI_API_KEY
+# cp .env.example .env   then fill in MONGO_URI, JWT_SECRET, GEMINI_API_KEY
 
 # Start backend server
 node server.js
@@ -388,7 +388,7 @@ The AI Interview feature requires a Google Gemini API key to function:
 1. If you don't already have one, get a Gemini API key from [Google AI Studio](https://ai.google.dev/)
 2. Add your API key to the `.env` file in the project root:
    ```
-   VITE_GEMINI_API_KEY=your_gemini_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
    ```
 3. Restart the development server
 

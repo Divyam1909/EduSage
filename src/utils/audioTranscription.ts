@@ -1,18 +1,11 @@
 // Audio Transcription Service using Gemini API
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGenerativeModel } from "./aiClient";
 
-// Initialize the Gemini API with the API key from environment variables
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? "";
-const genAI = new GoogleGenerativeAI(API_KEY);
-
-// Use gemini-3.5-flash model for transcription and analysis
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-3.5-flash",
-  generationConfig: {
-    temperature: 0.1, // Lower temperature for more accurate transcription
-    maxOutputTokens: 8192, // Allow for longer responses
-    responseMimeType: "application/json" // Indicate we prefer JSON responses
-  }
+// Requests go through the backend, which uses the gemini-3.5-flash model
+const model = getGenerativeModel({
+  temperature: 0.1, // Lower temperature for more accurate transcription
+  maxOutputTokens: 8192, // Allow for longer responses
+  responseMimeType: "application/json" // Indicate we prefer JSON responses
 });
 
 // Default timeout in milliseconds

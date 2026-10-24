@@ -1,14 +1,9 @@
 // Google Gemini AI API integration for EduSage
 // This file provides functions to interact with the Gemini API for interview assistance
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGenerativeModel } from "./aiClient";
 
-// Initialize the Gemini API with the API key from environment variables
-// Access environment variables with import.meta.env in Vite
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? "";
-const genAI = new GoogleGenerativeAI(API_KEY);
-
-// Use gemini-3.5-flash model which is available in the API
-const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+// Requests go through the backend, which uses the gemini-3.5-flash model
+const model = getGenerativeModel();
 
 // Helper function to handle model requests
 const handleModelRequest = async (prompt: string) => {

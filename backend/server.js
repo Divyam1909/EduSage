@@ -23,6 +23,7 @@ const { authenticateToken } = require('./middleware/auth');
 const calendarRoutes = require('./routes/calendarRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const teacherAuthRoutes = require('./routes/teacherAuth');
+const aiRoutes = require('./routes/aiRoutes');
 
 const app = express();
 
@@ -1486,6 +1487,7 @@ async function updateQuestionsAskedForAllUsers() {
 
 // Add API routes
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api/teacher', teacherAuthRoutes);
 
 // Run as a standalone server locally; on Vercel the app is imported by api/index.js
