@@ -4,7 +4,7 @@ const ResourceSchema = new mongoose.Schema({
   fileName: { type: String, required: true },
   courseName: { type: String, required: true },
   fileLink: { type: String, required: true },
-  bookmarked: { type: Boolean, default: false, index: true },  // New field for bookmarking and added index
+  bookmarkedBy: { type: [String], default: [], index: true },  // ids of the users who bookmarked it
   createdBy: { type: String }  // rollno of the student or id of the teacher who added it
 });
 

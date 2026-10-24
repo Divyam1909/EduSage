@@ -49,6 +49,7 @@ interface Attempt {
     questionId: number;
     answer: string;
     correct: boolean;
+    correctAnswer?: string;
     marksObtained: number;
   }[];
   totalScore: number;
@@ -770,7 +771,7 @@ export default function QuizInterface() {
                 ) : (
                   <p>Your Answer: {userAns}</p>
                 )}
-                <p>Correct Answer: {q.correctAnswer}</p>
+                <p>Correct Answer: {questionAttemptDetails?.correctAnswer ?? q.correctAnswer}</p>
                 <p>
                   Marks: {isCorrect ? q.marks : 0} / {q.marks}
                 </p>

@@ -17,7 +17,7 @@ const Answer = require('./models/Answer');
 const SubjectMark = require('./models/SubjectMark');
 const Quiz = require("./models/Quiz.js");
 const QuizAttempt = require("./models/QuizAttempt.js");
-const { authenticateToken, requireStudent } = require('./middleware/auth');
+const { authenticateToken, optionalAuth, requireStudent } = require('./middleware/auth');
 
 // Import routes
 const calendarRoutes = require('./routes/calendarRoutes');
@@ -33,6 +33,21 @@ const IS_SERVERLESS = !!process.env.VERCEL;
 // Teachers can manage any content; students only what they created
 const canManage = (user, createdBy) =>
   user.role === "teacher" || (!!createdBy && createdBy === user.rollno);
+
+// Stable id for the logged-in user: roll number for students, id for teachers
+const userKey = (user) => user.rollno || user.id;
+
+// Bookmarks are per user: expose only whether the current user bookmarked it
+const withBookmarkFlag = (resource, user) => {
+  const { bookmarkedBy = [], ...rest } = resource.toObject ? resource.toObject() : resource;
+  return { ...rest, bookmarked: !!user && bookmarkedBy.includes(userKey(user)) };
+};
+
+// Correct answers are visible only to teachers and the quiz's creator
+const forViewer = (quiz, user) => {
+  if (user && canManage(user, quiz.createdBy)) return quiz;
+  return { ...quiz, questions: quiz.questions.map(({ correctAnswer, ...q }) => q) };
+};
 
 // Define multer upload handler for file uploads
 const uploadHandler = multer({
@@ -312,20 +327,20 @@ app.post("/api/resources", authenticateToken, async (req, res) => {
     if (!fileName || !courseName || !fileLink) {
       return res.status(400).json({ message: "All fields are required" });
     }
-    const createdBy = req.user.rollno || req.user.id;
+    const createdBy = userKey(req.user);
     const newResource = new Resource({ fileName, courseName, fileLink, createdBy });
     await newResource.save();
-    res.status(201).json(newResource);
+    res.status(201).json(withBookmarkFlag(newResource, req.user));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 });
 
 // Get All Resources
-app.get("/api/resources", async (req, res) => {
+app.get("/api/resources", optionalAuth, async (req, res) => {
   try {
     const resources = await Resource.find().lean();
-    res.json(resources);
+    res.json(resources.map((r) => withBookmarkFlag(r, req.user)));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -344,7 +359,7 @@ app.put("/api/resources/:id", authenticateToken, async (req, res) => {
     }
     Object.assign(resource, { fileName, courseName, fileLink });
     const updatedResource = await resource.save();
-    res.json(updatedResource);
+    res.json(withBookmarkFlag(updatedResource, req.user));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -373,9 +388,13 @@ app.put("/api/resources/:id/bookmark", authenticateToken, async (req, res) => {
     const resource = await Resource.findById(req.params.id);
     if (!resource)
       return res.status(404).json({ message: "Resource not found" });
-    resource.bookmarked = !resource.bookmarked;
-    const updatedResource = await resource.save();
-    res.json(updatedResource);
+    const key = userKey(req.user);
+    const updatedResource = await Resource.findByIdAndUpdate(
+      resource._id,
+      resource.bookmarkedBy.includes(key) ? { $pull: { bookmarkedBy: key } } : { $addToSet: { bookmarkedBy: key } },
+      { new: true }
+    );
+    res.json(withBookmarkFlag(updatedResource, req.user));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -384,8 +403,8 @@ app.put("/api/resources/:id/bookmark", authenticateToken, async (req, res) => {
 // Get Only Bookmarked Resources
 app.get("/api/resources/bookmarked", authenticateToken, async (req, res) => {
   try {
-    const bookmarkedResources = await Resource.find({ bookmarked: true }).lean();
-    res.json(bookmarkedResources);
+    const bookmarkedResources = await Resource.find({ bookmarkedBy: userKey(req.user) }).lean();
+    res.json(bookmarkedResources.map((r) => withBookmarkFlag(r, req.user)));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -1016,7 +1035,7 @@ app.post("/api/quizzes", authenticateToken, async (req, res) => {
     ) {
       return res.status(400).json({ message: "All quiz fields are required and must be valid" });
     }
-    const createdBy = req.user.rollno || req.user.id;
+    const createdBy = userKey(req.user);
     const newQuiz = new Quiz({ title, topic, difficulty, timeLimit, points, questions, clearable, createdBy });
     await newQuiz.save();
     res.status(201).json(newQuiz);
@@ -1026,21 +1045,21 @@ app.post("/api/quizzes", authenticateToken, async (req, res) => {
 });
 
 // Get all Quizzes
-app.get("/api/quizzes", async (req, res) => {
+app.get("/api/quizzes", optionalAuth, async (req, res) => {
   try {
     const quizzes = await Quiz.find().lean();
-    res.json(quizzes);
+    res.json(quizzes.map((quiz) => forViewer(quiz, req.user)));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 });
 
 // Get a specific Quiz by ID
-app.get("/api/quizzes/:id", async (req, res) => {
+app.get("/api/quizzes/:id", optionalAuth, async (req, res) => {
   try {
     const quiz = await Quiz.findById(req.params.id).lean();
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-    res.json(quiz);
+    res.json(forViewer(quiz, req.user));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -1100,6 +1119,7 @@ app.post("/api/quizzes/:id/attempt", requireStudent, async (req, res) => {
         questionId: index, 
         answer: userAnswer, 
         correct: isCorrect, 
+        correctAnswer: q.correctAnswer,
         marksObtained 
       };
     });
@@ -1145,7 +1165,8 @@ app.get("/api/quizAttempts", requireStudent, async (req, res) => {
     const user = req.user.rollno;
     if (!user) return res.status(400).json({ message: "User required" });
     const attempts = await QuizAttempt.find({ user }).populate("quizId").lean();
-    res.json(attempts);
+    // Each attempt carries its own correct answers; don't leak the rest of the quiz key
+    res.json(attempts.map((a) => (a.quizId ? { ...a, quizId: forViewer(a.quizId, req.user) } : a)));
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }

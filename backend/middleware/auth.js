@@ -27,6 +27,19 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Identify the user when a valid token is sent, but allow anonymous requests
+function optionalAuth(req, res, next) {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (token) {
+    try {
+      req.user = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      // Invalid tokens are treated as anonymous on public routes
+    }
+  }
+  next();
+}
+
 // Only students (tokens carrying a roll number) may continue
 function requireStudent(req, res, next) {
   authenticateToken(req, res, () => {
@@ -49,6 +62,7 @@ function requireTeacher(req, res, next) {
 
 module.exports = {
   authenticateToken,
+  optionalAuth,
   requireStudent,
   requireTeacher
 }; 

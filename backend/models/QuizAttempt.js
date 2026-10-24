@@ -8,6 +8,7 @@ const QuizAttemptSchema = new mongoose.Schema({
       questionId: { type: Number, required: true },
       answer: { type: String, default: "" },
       correct: { type: Boolean, required: true },
+      correctAnswer: { type: String, default: "" },
       marksObtained: { type: Number, default: 0 },
     },
   ],
