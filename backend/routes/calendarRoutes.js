@@ -1,30 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
 const { extractEventsFromPDF } = require('../pdfParser');
 const Event = require('../models/Event');
 const { authenticateToken } = require('../middleware/auth'); // Import authentication middleware
 
-// Configure multer storage for PDF uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    // Use original filename but ensure it's a PDF
-    if (file.mimetype === 'application/pdf') {
-      cb(null, file.originalname);
-    } else {
-      cb(new Error('Only PDF files are allowed'), false);
-    }
-  }
-});
+// Keep PDF uploads in memory: they are only parsed, never stored
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -46,8 +28,7 @@ router.post('/upload', authenticateToken, upload.single('pdf'), async (req, res)
     }
 
     console.log(`Processing PDF file: ${req.file.originalname}`);
-    const pdfPath = req.file.path;
-    const pdfBuffer = fs.readFileSync(pdfPath);
+    const pdfBuffer = req.file.buffer;
     
     // Extract events from the uploaded PDF
     const events = await extractEventsFromPDF(pdfBuffer);
@@ -127,8 +108,7 @@ router.post('/upload-pdf', authenticateToken, upload.single('pdf'), async (req, 
     }
 
     console.log(`Processing PDF file: ${req.file.originalname}`);
-    const pdfPath = req.file.path;
-    const pdfBuffer = fs.readFileSync(pdfPath);
+    const pdfBuffer = req.file.buffer;
     
     // Extract events from the uploaded PDF
     const events = await extractEventsFromPDF(pdfBuffer);

@@ -26,6 +26,9 @@ const teacherAuthRoutes = require('./routes/teacherAuth');
 
 const app = express();
 
+// On Vercel the filesystem is read-only and there is no long-running process
+const IS_SERVERLESS = !!process.env.VERCEL;
+
 // Define multer upload handler for file uploads
 const uploadHandler = multer({
   storage: multer.memoryStorage(),
@@ -148,6 +151,7 @@ mongoose
   })
   .then(() => {
     console.log("MongoDB connected");
+    if (IS_SERVERLESS) return;
     // Start the notification checker after DB connection is established
     startNotificationChecker();
     
@@ -1301,7 +1305,7 @@ app.get("/api/notifications/check", async (req, res) => {
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logsDir)) {
+if (!IS_SERVERLESS && !fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
 
@@ -1313,7 +1317,12 @@ function logToFile(message, type = 'notification') {
   const logFile = path.join(logsDir, `${type}-${dateStr}.log`);
   
   const logEntry = `[${timestamp}] ${message}\n`;
-  
+
+  if (IS_SERVERLESS) {
+    console.log(`[${type}] ${message}`);
+    return;
+  }
+
   fs.appendFile(logFile, logEntry, (err) => {
     if (err) {
       console.error(`Error writing to log file: ${err.message}`);
@@ -1479,5 +1488,10 @@ async function updateQuestionsAskedForAllUsers() {
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/teacher', teacherAuthRoutes);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Run as a standalone server locally; on Vercel the app is imported by api/index.js
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+module.exports = app;

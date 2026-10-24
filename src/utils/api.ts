@@ -1,21 +1,9 @@
 //@ts-nocheck
 import axios from 'axios';
 
-// Determine if we're in production or deployed on Vercel
-const isProduction = import.meta.env.PROD;
-const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
-
-// Get the backend URLs
-const productionBackendUrl = 'https://edusagenew-production-5fef.up.railway.app';
-const developmentBackendUrl = 'http://localhost:5000';
-
-// Choose backend URL based on environment
-// Always use production backend URL when deployed on Vercel
-export const BACKEND_URL = isProduction || isVercel ? productionBackendUrl : developmentBackendUrl;
-
-// Log the backend URL being used
-console.log(`Using backend URL: ${BACKEND_URL}`);
-console.log(`Environment: ${isProduction ? 'Production' : 'Development'}, Vercel: ${isVercel}`);
+// The backend is served from the same origin under /api: by a Vercel function in
+// production and by the Vite dev proxy (to localhost:5000) in development
+export const BACKEND_URL = '/api';
 
 // Create an axios instance with the backend URL
 export const apiClient = axios.create({

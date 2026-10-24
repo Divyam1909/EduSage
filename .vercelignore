@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+backend/.env
+backend/logs/
+backend/uploads/
+node_modules/
+backend/node_modules/
+dist/
