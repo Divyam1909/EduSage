@@ -64,9 +64,14 @@ router.post("/forgot", async (req, res) => {
   res.json({ message: "If the teacher exists, a password reset link will be sent to the registered email." });
 });
 
-// Middleware to check if user is a teacher (for future use)
+// Middleware to check that the request comes from a logged-in teacher
 function authenticateTeacher(req, res, next) {
-  authenticateToken(req, res, next);
+  authenticateToken(req, res, () => {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ message: "Teacher access required" });
+    }
+    next();
+  });
 }
 
 // Get all students with details

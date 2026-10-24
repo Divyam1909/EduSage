@@ -191,7 +191,7 @@ connectToDatabase().catch(() => {});
 /** ========== REGISTER USER API ========== **/
 app.post("/register", async (req, res) => {
   try {
-    const { name, rollno, branch, sem, dateOfBirth, phone, email, password, realPassword } = req.body;
+    const { name, rollno, branch, sem, dateOfBirth, phone, email, password } = req.body;
     
     console.log("Registration request received:", { 
       name: !!name, 
@@ -201,8 +201,7 @@ app.post("/register", async (req, res) => {
       dateOfBirth: !!dateOfBirth, 
       phone: !!phone, 
       email: !!email,
-      hasPassword: !!password,
-      hasRealPassword: !!realPassword
+      hasPassword: !!password
     });
     
     // Check if all required fields are provided
@@ -234,7 +233,6 @@ app.post("/register", async (req, res) => {
       phone,
       email,
       password: hashedPassword,
-      realPassword: password || 'defaultPassword', // Ensure realPassword is always set
       wisdomPoints: 0,
       experience: 0,
       rank: 0,

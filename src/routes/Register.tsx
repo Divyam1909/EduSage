@@ -74,14 +74,12 @@ export default function Register() {
         branch,
         sem: parseInt(sem),
         dateOfBirth: formattedDate,
-        phone,
-        realPassword: password
+        phone
       };
       
       console.log("Registration data prepared (with sensitive info redacted):", {
         ...registrationData,
-        password: "[REDACTED]",
-        realPassword: "[REDACTED]"
+        password: "[REDACTED]"
       });
       
       // Call registration API endpoint

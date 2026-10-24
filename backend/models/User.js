@@ -9,7 +9,6 @@ const UserSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   email: { type: String, required: true },
   password: { type: String, required: true },
-  realPassword: { type: String, required: true },
   wisdomPoints: { type: Number, default: 0, index: true },
   experience: { type: Number, default: 0 },
   rank: { type: Number, default: 0 },
